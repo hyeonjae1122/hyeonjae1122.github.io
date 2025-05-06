@@ -27,8 +27,11 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Install Dependencies
-        run: npm install
+      - name: Clean and Install Dependencies
+        run: |
+            rm -rf node_modules package-lock.json
+            npm cache clean --force
+            npm install
 
       - name: Build Angular App
         run: npm run build -- --configuration production --base-href /${{ github.event.repository.name }}/
