@@ -1,9 +1,7 @@
 ---
 layout: post
-title:  "글 쓰는 방법"
+title:  "실리움 시작하기전에 TL;DR"
 ---
-
-# 실리움 시작하기전에 TL;DR
 
 #### 실리움 아키텍처
 ![img.png](../assets/1week-arch/img.png)
