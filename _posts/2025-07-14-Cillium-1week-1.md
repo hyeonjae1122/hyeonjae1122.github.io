@@ -1,6 +1,8 @@
 ---
 layout: post
 title:  "Cilium Migration"
+categories: [kubernetes,Cilium]
+tags: [cilium,k8s]
 ---
 
 
