@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Cilium - 개요"
+title:  "[Cilium Study 1기 by Gasida] Cilium - 개요"
 categories: [kubernetes,Cilium]
 tags: [cilium,k8s]
 ---

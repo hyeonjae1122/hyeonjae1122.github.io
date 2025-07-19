@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Cilium Migration"
+title:  "[Cilium Study 1기 by Gasida] - Cilium Migration"
 categories: [kubernetes,Cilium]
 tags: [cilium,k8s]
 ---
@@ -703,6 +703,6 @@ curl -s http://localhost:32042/metrics | grep '^goldpinger_nodes_health_total' c
 cilium connectivity test
 ```
 
-
+![img.png](../assets/1week-arch/1week1-38.png)
 
 
