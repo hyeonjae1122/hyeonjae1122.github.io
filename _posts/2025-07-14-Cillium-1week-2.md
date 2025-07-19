@@ -1,9 +1,11 @@
 ---
 layout: post
 title:  "Cilium - 개요"
+categories: [kubernetes,Cilium]
+tags: [cilium,k8s]
 ---
 
-# `Cilium` 간단 요약
+# Cilium 간단 요약
 
 ![img.png](../assets/1week-arch/img.png)
 

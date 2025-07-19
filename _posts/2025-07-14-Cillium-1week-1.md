@@ -24,7 +24,7 @@ tags: [cilium,k8s]
 
 ## Background
 
-마이그레이션을 진행할 경우 일반적으로 Cilium cni를 포인팅 하도록 /etc/cni/net.d를 재구성하는데 이미 존재하는 파드는 여전히 기존의 CNI 설정값을 따르고 있다. 마이그레이션을 완료하기 위해서는 기존의 CNI로 구성된 클러스터드의 모든 파드를 새 CNI로 재구성하여야 한다.
+마이그레이션을 진행할 경우 일반적으로 Cilium cni를 포인팅 하도록 `/etc/cni/net.d`를 재구성하는데 이미 존재하는 파드는 여전히 기존의 CNI 설정값을 따르고 있다. 마이그레이션을 완료하기 위해서는 기존의 CNI로 구성된 클러스터드의 모든 파드를 새 CNI로 재구성하여야 한다.
 
 한가지 단순한 방법으로는 모든 노드를 새로운 CNI로 재구성한 다음 클러스터의 각 노드를 점진적으로 다시 시작하여 노드가 다시 시작될 때 모든 파드가 새로운 CNI에 포함되도록 하는 것이다.
 
@@ -564,7 +564,7 @@ kubectl -n kube-system rollout status ds/cilium -w
 curl -s http://localhost:32042/metrics | grep '^goldpinger_nodes_health_total' curl -s http://localhost:32043/metrics | grep '^goldpinger_nodes_health_total'
 ```
 
-컨트롤 플레인을 재시작 했기때문에 다운 타임이 발생할 수 있다. (unhealthy)
+컨트롤 플레인을 재시작 했기 때문에 다운 타임이 발생할 수 있다. (unhealthy)
 
 
 - 커넥티비티를 확인하자.
