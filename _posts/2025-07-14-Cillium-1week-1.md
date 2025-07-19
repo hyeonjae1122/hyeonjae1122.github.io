@@ -68,10 +68,8 @@ Cilium은 먼저 오버레이를 구축한다. 하지만 어떤 파드에도 CNI
 ## 마이그레이션 과정
 
 ### 준비사항
-
-Kind로 클러스터를 작성하고 Flannel을 설치한다
-
-1. 클러스터 생성을 위한 yaml 파일을 작성
+ 클러스터 생성을 위한 yaml 파일을 작성한다. 하나의 컨트롤 플레인과 4개의 워커노드를 생성한다.
+ (기본적으로 Calico CNI가 설치되어있다.)
 
 ```bash
 $ cat <<EOF > kind-config.yaml
@@ -96,50 +94,84 @@ networking:
 ```
 
 
-<br><br>
-하나의 컨트롤 플레인과 4개의 워커노드를 생성한다.
+노드 상태를 확인 하자. 모든 노드가 Ready 상태로 정상 동작중이다.
 
-- 노드 상태를 확인하자
 ```bash
 kubectl get nodes
 ```
+![img.png](../assets/1week-arch/1week1-1.png)
 
-- 아래의 명령어로 데몬셋이 제대로 배포 되었는지 확인하자.
+아래의 명령어로 `Calico` 데몬셋이 제대로 배포 되었는지 확인하자.
+
 ```bash
 kubectl -n calico-system rollout status ds/calico-node
 ```
+`daemon set "calico-node" successfully rolled out` 이라는 문구가 보이면 성공
 
-- 또한 각 노드의 파드CIDR를 확인해보자.
+
+또한 각 노드의 파드CIDR를 확인해보자.
+
 ```bash
 kubectl get ipamblocks.crd.projectcalico.org \ -o jsonpath="{range .items[*]}{'podNetwork: '}{.spec.cidr}{'\t NodeIP: '}{.spec.affinity}{'\n'}{end}"
 ```
 
-- 노드의 연결상태를 모니터링하기 위해 각 노드당 Goldpinger를 배포하자.
+![img_1.png](../assets/1week-arch/1week1-2.png)
 
+노드의 연결상태를 모니터링하기 위해 각 노드당 Goldpinger를 파드를 배포하자.
+
+![img_2.png](../assets/1week-arch/1week1-3.png)
 ```bash
 kubectl rollout status daemonset nodepinger-goldpinger
 kubectl get po -l app.kubernetes.io/instance=nodepinger -o wide
 ```
 
 현재 컨트롤플레인과 워커노드가 전부 연결 되어 있는 것을 시각적으로 확인 할 수 있다.
+(실습환경 기준)
+![img_3.png](../assets/1week-arch/1week1-4.png)
 
-- 200상태를 응답하는지 확인해보자.
+200상태를 응답하는지 확인해보자.
+
 ```bash
 curl -s http://localhost:32042/check | jq
 ```
 
+![img_4.png](../assets/1week-arch/1week1-5.png)
 
 노드 헬스체크를 해보자. 5개의 노드(컨트롤1 + 워커4)가 모두 정상이다.
 
+![img_5.png](../assets/1week-arch/1week1-6.png)
 
-## 준비사항
+
+**두번째 Goldpinger 배포**
+
+첫번째 Goldpinger 디플로이먼트는 실험적이며, 데몬셋을 사용하였으므로 우리가 마이그레이션을 위해 노드 드레인을 해도
+삭제 되지 않는다. 차이를 비교하기위해 우리는 두번째 Goldpinger를 배포한다.
+
+```bash
+kubectl apply -f /tmp/goldpinger_deploy.yaml
+kubectl rollout status deployment goldpinger
+kubectl get po -l app=goldpinger -o wide
+kubectl expose deployment goldpinger --type NodePort \
+--overrides '{"spec":{"ports": [{"port":80,"protocol":"TCP","targetPort":8080,"nodePort":32043}]}}'
+```
+
+헬스체크  
+`curl -s http://localhost:32043/check | jq`
+
+![img_7.png](../assets/1week-arch/1week1-8.png)
+
+10개 모두 healthy한 것을 볼 수 있다.  
+`curl -s http://localhost:32043/metrics | grep '^goldpinger_nodes_health_total'`
+
+![img_6.png](../assets/1week-arch/1week1-7.png)
 
 ### 파드 CIDR
 
 가장 첫번째 단계는 새로운 파드를 위한 새로운 CIDR값을 결정하는 것이다.  Calico는 아래와 같이 192.168.0.0/16을 기본적으로 사용한다. (flannel은 10.244.0.0/16) 충돌을 피하기 위해 우리는 10.244.0.0/16을 선택한다.(flannel일 경우 10.245.0.0/16으로 하자)
 
-
-
+> 파드CIDR 확인 명령어  
+>`kubectl get installations.operator.tigera.io default \
+-o jsonpath='{.spec.calicoNetwork.ipPools[*].cidr}{"\n"}'`
 
 
 ### 프로토콜 인캡슐레이션
@@ -147,8 +179,9 @@ curl -s http://localhost:32042/check | jq
 두번째 단계는 기존의 인캡슐레이션 포트와 다른 포트번호를 선택하거나 다른 프로토콜을 선택한다.
 - Calico는 VXLANCrossSubnet 프로토콜을 사용하며 8472번 포트가 기본값이다. 우리는 충돌을 피하기 위해서 8473번 포트를 사용한다.
 
-
-
+> 프로토콜 확인 명령어  
+> `kubectl get installations.operator.tigera.io default \
+-o jsonpath='{.spec.calicoNetwork.ipPools[*].encapsulation}{"\n"}'`
 
 ### 마이그레이션을 위한 Cilium Values
 
@@ -184,7 +217,8 @@ operator:
 
 #### VXLAN 설정
 
-- Cilium VXLAN과 Calico VXLAN 충돌을 막기위해 포트번호를 변경한다. (기본 8472)
+Cilium VXLAN과 Calico VXLAN 충돌을 막기위해 포트번호를 변경한다. (기본 8472)
+
 ```bash
 tunnelPort: 8473
 ```
@@ -195,6 +229,7 @@ tunnelPort: 8473
   - CNI구성을 일시적으로 패스한다. 이는 Cilium이 즉시 작업을 처리하는 것을 방지하기 위함이다.
 - `uninstall: false`
   - false를 사용하면 Cilium이 Calico의 CNI 구성파일과 플러그인 바이너리를 제거하지 못하므로 임시 마이그레이션 상태가 허용된다.
+
 ```yaml
 cni:
   customConf: true
@@ -204,7 +239,8 @@ cni:
 
 #### IPAM 설정
 
-- 라이브 마이그레이션은 Cluster Pool IPAM 모드를 사용할 필요가있으며 파드CIDR은 Calico의 CIDR값과 구별될 필요가 있다.
+라이브 마이그레이션은 Cluster Pool IPAM 모드를 사용할 필요가있으며 파드CIDR은 Calico의 CIDR값과 구별될 필요가 있다.
+
 ```yaml
 ipam:
   mode: "cluster-pool"
@@ -214,14 +250,16 @@ ipam:
 
 #### 네트워크정책 설정
 
--  마이그레이션이 완료 될 때까지 네트워크정책을 비활성화 한다. 마이그레이션 후에는 네트워크 정책이 적용된다.
+마이그레이션이 완료 될 때까지 네트워크정책을 비활성화 한다. 마이그레이션 후에는 네트워크 정책이 적용된다.
+
 ```yaml
 policyEnforcementMode: "never"
 ```
 
 #### BPF 구성
 
-- 호스트 스택을 통해 트래픽을 라우팅하여 마이그레이션 중 연결을 제공한다. 마이그레이션 도중 Calico 관리 파드와 Cilium 관리파드의 연결성을 확인한다.
+호스트 스택을 통해 트래픽을 라우팅하여 마이그레이션 중 연결을 제공한다. 마이그레이션 도중 Calico 관리 파드와 Cilium 관리파드의 연결성을 확인한다.
+
 ```yaml
 bpf:
   hostLegacyRouting: true
@@ -230,7 +268,7 @@ bpf:
 
 ### Cilium Helm Values 생성
 
-- cilium-cli를 사용하면 자동으로 클러스터 플랫폼을 감지하여 Helm values를 생성해 준다.
+cilium-cli를 사용하면 자동으로 클러스터 플랫폼을 감지하여 Helm values를 생성해 준다.
 ```bash 
 cilium install \ --helm-values values-migration.yaml \ --dry-run-helm-values > values-initial.yaml
 ```
@@ -251,46 +289,66 @@ cilium install \ --helm-values values-migration.yaml \ --dry-run-helm-values > v
 
 #### Calico가 Cilium interfaces를 사용하지 못하도록 방지
 
-
 노드에 Cilium을 설치할 때 Cilium은 `cilium_host` 라는 새로운 네트워크 인터페이스를 생성할 것이다. 만약 Calico가 `cilium_host`를 기본 네트워크 인터페이스로 사용한다면 당연 Calico 노드 라우팅은 실패할 것이다. 이러한 이유로 우리는 Calico가 `cilium_host`인터페이스를 무시하도록 해줘야한다.
 
 
 단순하게, `firstFound: false` 와 `kubernetes: NodeInternalIP` 를 설정해주면 끝이다. 이러면 Calico는 노드 internalIP를 메인 인터페이스로 사용할 것이다.
 
-- patch 명령
+패치전 확인 
+
+```bash
+kubectl get installations.operator.tigera.io default \
+  -o jsonpath='{.spec.calicoNetwork.nodeAddressAutodetectionV4}{"\n"}'
+```
+
+![img_8.png](../assets/1week-arch/1week1-9.png)
+
+patch 명령
+
 ```bash
 kubectl patch installations.operator.tigera.io default --type=merge \ --patch '{"spec": {"calicoNetwork": {"nodeAddressAutodetectionV4": {"firstFound": false, "kubernetes": "NodeInternalIP"}}}}'
 ```
 
+패치 결과 확인
+```bash
+kubectl get installations.operator.tigera.io default \
+  -o jsonpath='{.spec.calicoNetwork.nodeAddressAutodetectionV4}{"\n"}'
+```
 
+![img_9.png](../assets/1week-arch/1week1-10.png)
 
 
 
 ### Cilium 설치
 
 helm을 사용하여 cilium을 설치한다.
+
 ```bash
-helm repo add cilium https://helm.cilium.io/ helm upgrade --install --namespace kube-system cilium cilium/cilium \ --values values-initial.yaml
+helm repo add cilium https://helm.cilium.io/ 
+helm upgrade --install --namespace kube-system cilium cilium/cilium \ --values values-initial.yaml
 ```
 
 
 `cilium status --wait` 으로 상태를 확인해보자. Cilium, Operator, Envoy DaemonSet 전부 OK이다. 마이그레이션이 아직 끝나지 않았으므로 Cilium이 관리하는 파드는 아래와 같이 0인것을 확인 할 수 있다.
 
+![img_11.png](../assets/1week-arch/1week1-12.png)
 
 
 
 
+아래 docker 명령어로 워커노드에 진입해보면 `/etc/cni/net.d/` 경로에 calico만 존재한다.  Cilium은 모든 노드에 설치 되었고 노드 간에 오버레이가 설정되었지만 아직 노드의 Pod를 관리 할 수 있도록 설정해주지 않았다.  따라서 Kubelet은 아직 Cilium을 사용 할 수 없다.
 
-- 아래 docker 명령어로 워커노드에 진입해보면 `/etc/cni/net.d/` 경로에 calico만 존재한다.  Cilium은 모든 노드에 설치 되었고 노드 간에 오버레이가 설정되었지만 아직 노드의 Pod를 관리 할 수 있도록 설정해주지 않았다.  따라서 Kubelet은 아직 Cilium을 사용 할 수 없다.
 ```bash
 docker exec kind-worker ls /etc/cni/net.d/
 ```
 
+![img_12.png](../assets/1week-arch/1week1-13.png)
 
 
+### CiliumNodeConfig
 
-- Cilium 표준 설치에는 각 노드에 설치되는 Cilium 에이전트는 `ConfigMap` 리소스인 `cilium-config`에 관리되며 모두 같은 구성값을 가진다.
-- 그러나, 이번 마이그레이션은 한번에 하나의 노드씩만 점진적으로 진행할 것이다.  그러기 위해서는 `CiliumNodeConfg` 리소스 타입(CRD - Cilium 1.13에서 추가됨) 을 사용 할 것인데 이는 각 노드별로Cilium 에이전트를 구성 할 수 있도록 지원한다.
+Cilium 표준 설치에는 각 노드에 설치되는 Cilium 에이전트는 `ConfigMap` 리소스인 `cilium-config`에 관리되며 모두 같은 구성값을 가진다.
+그러나, 이번 마이그레이션은 한번에 하나의 노드씩만 점진적으로 진행할 것이다.  그러기 위해서는 `CiliumNodeConfg` 리소스 타입(CRD - Cilium 1.13에서 추가됨) 을 사용 할 것인데 이는 각 노드별로Cilium 에이전트를 구성 할 수 있도록 지원한다.
 
 
 아래와 같이 `ciliumnodeconfig.yaml` 을 작성한다.
@@ -311,12 +369,21 @@ spec:
     cni-chaining-mode: "none"
     cni-exclusive: "true"
 ```
-
-
+ciliumnodeconfig 파일 적용
 ```bash
 kubectl apply --server-side -f ciliumnodeconfig.yaml
 ```
 
+라벨 체크
+
+```bash
+kubectl get no --show-labels
+```
+
+아직은 `io.cilium.migration/cilium-default: "true"` 에 매칭되는 라벨이 없다. 아직 실제로 어떤 노드에도 
+적용된 상황은 아니기 때문이다.   
+<br>
+![img_13.png](../assets/1week-arch/1week1-14.png)
 <br>
 
 ### Migration
@@ -327,90 +394,134 @@ kubectl apply --server-side -f ciliumnodeconfig.yaml
 
 노드를 드레이닝 할 경우 실행중인 모든 파드가 노드에서 정상적으로 제거된다. 이를 통해 파드가 갑자기 종료되는 것을 방지하고 해당 파드의 워크로드가 다른 사용 가능한 노드에서 정상적으로 처리 될 수 있도록 한다.
 
-- `kind-worker` 노드를 cordon시키자.
+`kind-worker` 노드를 cordon시키자.
+
 ```bash
 NODE="kind-worker"
 kubectl cordon $NODE
 ```
 
-- `kubectl drain $NODE --ignore-daemonsets` 로 노드를 드레이닝한다. 노드를 드레이닝 할 경우 해당 노드는 자동으로 격리된다.
-  
+`kubectl drain $NODE --ignore-daemonsets` 로 노드를 드레이닝한다. 노드를 드레이닝 할 경우 해당 노드는 자동으로 격리된다.
+
+![img_14.png](../assets/1week-arch/1week1-15.png)
 
 
 
-- 드레이닝 된 노드에서 실행중인 파드가 없는지 확인한다.  아래 사진의 경우 하나의 파드가 남아있는데 이는 데몬셋의 일부이기 때문이다.
+드레이닝 된 노드에서 실행중인 파드가 없는지 확인한다.  아래 사진의 경우 하나의 파드가 남아있는데 이는 데몬셋의 일부이기 때문이다.
 ```bash
 kubectl get pods -o wide --field-selector spec.nodeName=$NODE
 ```
 
+![img_15.png](../assets/1week-arch/1week1-16.png)
 
-- 여전히 5개의 파드를 인식하는지 확인
+여전히 5개의 파드를 인식하는지 확인
 ```bash
 curl -s http://localhost:32042/metrics | grep '^goldpinger_nodes_health_total'
 ```
 
+![img_16.png](../assets/1week-arch/1week1-17.png)
+<br><br>
 
 
 
 #### 라벨 지정 및 재시작
 
 노드에 레이블을 지정하면 `CiliumNodeConfig` 가 노드에 적용된다.
+
 ```bash 
 kubectl label node $NODE --overwrite "io.cilium.migration/cilium-default=true"
 ```
 
 
-- 노드의 Cilium을 재시작한다. 이것이 트리거가 되어 CNI configuration file을 생성할 것이다.
+노드의 Cilium을 재시작한다. 이것이 트리거가 되어 CNI configuration file을 생성할 것이다.
+
 ```bash
 kubectl -n kube-system delete pod --field-selector spec.nodeName=$NODE -l k8s-app=cilium 
 kubectl -n kube-system rollout status ds/cilium -w
 ```
+![img_17.png](../assets/1week-arch/1week1-18.png)
 
+이제 해당 노드에 진입해보자. 아까와 다르게 `05-cilium.conflist` 가 생성되었다.  또한 `10-calico.conflist.cilium_bak` 으로 리네이밍된 것을 확인 할 수 있다.(백업 파일 생성)
+이제 해당 노드의 kubelet은 CNI 프로바이더로 Cilium을 사용 할 수 있다.
 
-- 이제 해당 노드에 진입해보자. 아까와 다르게 `05-cilium.conflist` 가 생성되었다.  또한 `10-calico.conflist.cilium_bak` 으로 리네이밍된 것을 확인 할 수 있다.(백업 파일 생성)
-- 이제 해당 노드의 kubelet은 CNI 프로바이더로 Cilium을 사용 할 수 있다.
 ```bash
 docker exec $NODE ls /etc/cni/net.d/
 ```
+![img_19.png](../assets/1week-arch/1week1-20.png)
 
 
-
-- 그럼 체크해보자.
+그럼 체크해보자.
 ```bash
 kubectl get po -l app.kubernetes.io/instance=nodepinger \ --field-selector spec.nodeName=$NODE -o wide
 ```
+![img_20.png](../assets/1week-arch/1week1-21.png)
 
-- 아직 `192.168.0.0/16` 대역인 것을 확인할 수 있다.
+아직 `192.168.0.0/16` 대역인 것을 확인할 수 있다.  
+<br><br>
 
-- 파드 재시작
-  `kubectl delete po -l app.kubernetes.io/instance=nodepinger \ --field-selector spec.nodeName=$NODE`
+아래 명령어로 파드 재시작하자.  
+`kubectl delete po -l app.kubernetes.io/instance=nodepinger \ --field-selector spec.nodeName=$NODE`
 
 
--  다시 체크해보자.
+다시 체크해보자.
+
 ```bash
 kubectl get po -l app.kubernetes.io/instance=nodepinger \ --field-selector spec.nodeName=$NODE -o wide 
 ```
 <br><br>
 
+‼ 파드아이피가 바뀐것을 확인 할 수 있다. 이제 `10.244.0.0/16`IP 수신이 가능하다. 
+
+![img_21.png](../assets/1week-arch/1week1-22.png)
+
+연결상태가 양호한지 다시 확인하자.
+
+```bash
+curl -s http://localhost:32042/metrics | grep '^goldpinger_nodes_health_total'
+```
+![img_22.png](../assets/1week-arch/1week1-23.png)
+
 #### Cilium 검증
 
-- cilium cli로 확인해보자. 아래 사진처럼 Cilium으로 관리되는 파드가 0개에서 1개로 늘어난 것을 확인 할 수 있다.
+cilium cli로 확인해보자. 아래 사진처럼 Cilium으로 관리되는 파드가 0개에서 1개로 늘어난 것을 확인 할 수 있다.
 ```bash
 cilium status --wait
 ```
 
+![img_23.png](../assets/1week-arch/1week1-24.png)
 
 
+파드 CIDR를 확인 해보자.
 
-- 파드 CIDR를 확인 해보자.
 ```bash
 kubectl get ciliumnode kind-worker \ -o jsonpath='{.spec.ipam.podCIDRs[0]}{"\n"}'
 ```
 
-- `10.244.2.0/16` 임을 확인
+![img_24.png](../assets/1week-arch/1week1-25.png)
 
+이제 노드를 다시 `uncordon`한다.
+```bash
+kubectl uncordon $NODE
+```
 
+goldpinger 파드 수를 다시 늘린다. 
+```bash
+kubectl scale deployment goldpinger --replicas 15
+```
 
+새로운 파드에 할당된 IP를 확인한다
+
+```bash
+kubectl get po -l app=goldpinger --field-selector spec.nodeName=$NODE -o wide
+```
+![img_25.png](../assets/1week-arch/1week1-26.png)
+
+배포된 파드에서 모든 ping이 제대로 작동하는지 확인한다.
+
+```bash
+curl -s http://localhost:32043/metrics | grep '^goldpinger_nodes_health_total'
+```
+![img_26.png](../assets/1week-arch/1week1-27.png)
 <br><br>
 #### 남아있는 워커노드에도 같은 작업 반복
 
@@ -430,8 +541,10 @@ done
 ```bash
 cilium status --wait
 ```
+![img_27.png](../assets/1week-arch/1week1-28.png)
 
 
+Nodeping DaemonSet 파드는 여전히 이전 파드 CIDR에 존재하므로 모두 다시 시작한다. 
 
 ```bash
 kubectl rollout restart daemonset nodepinger-goldpinger
@@ -441,8 +554,17 @@ kubectl rollout status daemonset nodepinger-goldpinger
 ```bash
 kubectl get po -o wide
 ```
+컨트롤 플레인을 제외한 워커노드의 파드들의 IP대역이 바뀐것을 확인할 수 있다. 
+![img_28.png](../assets/1week-arch/1week1-29.png)
 <br><br>
 
+헬스체크
+```bash
+curl -s http://localhost:32042/metrics | grep '^goldpinger_nodes_health_total'
+curl -s http://localhost:32043/metrics | grep '^goldpinger_nodes_health_total'
+```
+
+![img_29.png](../assets/1week-arch/1week1-30.png)
 #### 컨트롤 플레인에 대해서도 반복
 
 
@@ -453,25 +575,26 @@ kubectl label node $NODE --overwrite "io.cilium.migration/cilium-default=true" k
 kubectl -n kube-system rollout status ds/cilium -w kubectl uncordon $NODE
 ```
 
-- Nodepinger파드를 모두 재시작한다.
+Nodepinger파드를 모두 재시작한다.
 ```bash
 kubectl rollout restart daemonset nodepinger-goldpinger
 kubectl rollout status daemonset nodepinger-goldpinger
 ```
 
-- 모든 존재하고있는 모든 파드를 Cilium으로 마이그레이션을 완료하기 위하여 calico-system의 네임스페이스를 가진  `csi-node-driver` 데몬셋파드를 재시작한다.
+모든 존재하고있는 모든 파드를 Cilium으로 마이그레이션을 완료하기 위하여 calico-system의 네임스페이스를 가진  `csi-node-driver` 데몬셋파드를 재시작한다.
 ```bash
 kubectl rollout restart daemonset -n calico-system csi-node-driver 
 kubectl rollout status daemonset -n calico-system csi-node-driver
 ```
 
 
-- 최종 상태를 확인하자.
+최종 상태를 확인하자.
 
 ```bash
 cilium status --wait
 ```
 
+![img_30.png](../assets/1week-arch/1week1-31.png)
 
 
 이로써 모든 파드들이 Cilium관리하에 들어왔다. 마이그레이션은 성공적이다.
@@ -479,8 +602,11 @@ cilium status --wait
 <br><br> 
 ### 클린 업
 
+네트워크 정책을 지원하도록 Cilium 구성을 업데이트하고 이전 네트워크 플러그인을 제거한다.
+몇가지 파라메터를 오버라이딩하는 Helm values 파일을 새롭게 생성하자.
 
-- 몇가지 파라메터를 오버라이딩하는 Helm values 파일을 새롭게 생성하자.
+Cilium이 정상화 되었으므로 Cilium 구성을 업데이트 하자. 
+
 ```bash
 cilium install \
   --helm-values values-initial.yaml \
@@ -490,17 +616,19 @@ cilium install \
   --dry-run-helm-values > values-final.yaml
 ```
 
-- 우리는 cilium-cli 사용하여 업데이트된 Helm config파일을 생성한다. 기존과 무엇이 다른지 확인해보자.
+우리는 cilium-cli 사용하여 업데이트된 Helm config파일을 생성한다. 기존과 무엇이 다른지 확인해보자.
 ```bash
 diff -u --color values-initial.yaml values-final.yaml
 ```
+![img_31.png](../assets/1week-arch/1week1-32.png)
 
 - 보는바와 같이 노드 구성 값을 disabling하며 Cilium CNI 구성파일을 작성한다.
 - Cilium은 관리되지 않은 파드들을 재시작 할 수 있도록 설정
 - NetworkPolicy를 활성화 한다.
 
 
-- 아래와 같이 적용하고 Cilium 데몬셋을 롤아웃 시키자.
+이제 아래와 같이 적용하고 Cilium 데몬셋을 롤아웃 시키자.
+
 ```bash
 helm upgrade --install \
   --namespace kube-system cilium cilium/cilium \
@@ -509,6 +637,7 @@ kubectl -n kube-system rollout restart daemonset cilium
 cilium status --wait
 ```
 
+![img_32.png](../assets/1week-arch/1week1-33.png)
 
 마지막으로 `CiliumNodeConfig` 리소스를 삭제한다.
 ```
@@ -522,11 +651,14 @@ kubectl delete --force -f https://raw.githubusercontent.com/projectcalico/calico
 kubectl delete --force -f https://raw.githubusercontent.com/projectcalico/calico/v3.25.1/manifests/custom-resources.yaml 
 kubectl delete --force namespace calico-system
 ```
+![img_33.png](../assets/1week-arch/1week1-34.png)
 
 <br><br>
+
 #### 노드 재시작
 
-- 워커노드를 재시작하자
+워커노드를 재시작하자
+
 ```bash
 for i in " " $(seq 2 4); do 
   node="kind-worker${i}" 
@@ -538,22 +670,35 @@ done
 ```
 
 
-- 컨트롤 플레인을 재시작하자
+컨트롤 플레인을 재시작하자
+
 ```bash
 docker restart kind-control-plane 
 sleep 5 
 kubectl -n kube-system rollout status ds/cilium -w
 ```
 
-- 데몬셋과 Goldpinger 디플로이먼트를 확인해보자.
+Cilium 상태확인
+
+```bash
+cilium status --wait
+```
+![img_34.png](../assets/1week-arch/1week1-35.png)
+데몬셋과 Goldpinger 디플로이먼트를 확인해보자
+
 ```bash
 curl -s http://localhost:32042/metrics | grep '^goldpinger_nodes_health_total' curl -s http://localhost:32043/metrics | grep '^goldpinger_nodes_health_total'
 ```
 
 컨트롤 플레인을 재시작 했기 때문에 다운 타임이 발생할 수 있다. (unhealthy)
+![img_35.png](../assets/1week-arch/1week1-36.png)
 
+시간 간격을 좀 두고 확인해보자
 
-- 커넥티비티를 확인하자.
+![img_36.png](../assets/1week-arch/1week1-37.png)
+
+연결성(connectivity)를 확인하자.
+
 ```bash
 cilium connectivity test
 ```
