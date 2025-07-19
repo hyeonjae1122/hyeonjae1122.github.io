@@ -5,13 +5,13 @@ categories: [kubernetes,Cilium]
 tags: [cilium,k8s]
 ---
 # 기존 쿠버네티스 네트워킹의 문제점
-<br>
+  
+
 `Cilium`은 모든 CNI 관련 작업을 처리 하고 `ingress controller`,`Gateway API` 및 기타 모든 기능을 구현한다. 하지만
 일반적인 서비스 라우팅과 로드 밸런싱은 `kube-proxy`에게 위임한다. 하지만 이 역시도 `Cilium`을 사용하여 `kube-proxy`를 대체하도록 구성할 수도있다. 
-그렇다면 궁극적으로 `kube-proxy`를 대체하는 이유는 무엇인가? `Kube-proxy`는 트래픽을 분산 시키기한 IPTables은 서비스가 늘어나는 동적인 쿠버네티스 환경에는
-적합 하지 않다. 파드의 동적인 변화가 일어 날 때마다 전체 재구성이 트리거 될 수 있다. 즉 서비스를 하나 더 추가하거나 변경 할 때마다 `IPTables` 룰을 다시 만들
+그렇다면 궁극적으로 `kube-proxy`를 대체하는 이유는 무엇인가? `Kube-proxy`는 트래픽을 분산 시키기한 `IP Tables`은 서비스가 늘어나는 동적인 쿠버네티스 환경에는
+적합 하지 않다. 파드의 동적인 변화가 일어 날 때마다 전체 재구성이 트리거 될 수 있다. 즉 서비스를 하나 더 추가하거나 변경 할 때마다 `IP Tables` 룰을 다시 만들
 어야 할 수도 있다.   
-<br><br>
 
 하지만 `Cilium`의 경우 순차적으로 처리하는 `IP Tables`과는 다르게 해시테이블을 사용한다. 결과를 검색할 때 해시테이블을 사용하므로 훨씬 효율적이다.
 즉 서비스 수가 늘어나도 처리 시간이 선형적으로 늘어나지 않는다. 따라서 증가하는 서비스에도 더 낮은 지연시간, 더 높은 확장성, 더 효율적인 로드 밸런싱
@@ -34,7 +34,6 @@ tags: [cilium,k8s]
 ## 듀얼 오버레이를 통한 마이그레이션
 
 위와 같은 문제를 해결하기 위해 Cilium은 클러스터 전체에 두개의 별도 오버레이가 설정되는 하이브리드 모드를 지원한다.  특정 노드의 파드는 하나의 CNI에만 연결 될 수 있지만 마이그레이션이 진행되는 동안 Cilium 파드와 그렇지 않은 파드 모두 접근 할 수 있다.
-
 
 이번 문서에서는 배포된 두개의 CNI간의 무중단 마이그레이션 모델에대해 논의하고자한다.  이러한 이점은 당연히 노드와 워크로드의 다운타임을 감소 시킬 수 있으며 마이그레이션이 진행되는 동안 각각의 CNI에서 워크로드가 원할 하게 통신 할 수 있도록 보장할 수 있는 이점이 있다.
 
@@ -96,48 +95,41 @@ networking:
   podSubnet: 192.168.0.0/16
 ```
 
-- 하나의 컨트롤 플레인과 4개의 워커노드를 생성한다.
 
-노드 상태를 확인하자
+<br><br>
+하나의 컨트롤 플레인과 4개의 워커노드를 생성한다.
+
+- 노드 상태를 확인하자
 ```bash
 kubectl get nodes
 ```
 
-아래의 명령어로 데몬셋이 제대로 배포 되었는지 확인하자.
+- 아래의 명령어로 데몬셋이 제대로 배포 되었는지 확인하자.
 ```bash
 kubectl -n calico-system rollout status ds/calico-node
 ```
 
-또한 각 노드의 파드CIDR를 확인해보자.
+- 또한 각 노드의 파드CIDR를 확인해보자.
 ```bash
 kubectl get ipamblocks.crd.projectcalico.org \ -o jsonpath="{range .items[*]}{'podNetwork: '}{.spec.cidr}{'\t NodeIP: '}{.spec.affinity}{'\n'}{end}"
 ```
 
-
-
-노드의 연결상태를 모니터링하기 위해 각 노드당 Goldpinger를 배포하자.
+- 노드의 연결상태를 모니터링하기 위해 각 노드당 Goldpinger를 배포하자.
 
 ```bash
 kubectl rollout status daemonset nodepinger-goldpinger
 kubectl get po -l app.kubernetes.io/instance=nodepinger -o wide
 ```
 
-
 현재 컨트롤플레인과 워커노드가 전부 연결 되어 있는 것을 시각적으로 확인 할 수 있다.
 
-
-
-200상태를 응답하는지 확인해보자.
+- 200상태를 응답하는지 확인해보자.
 ```bash
 curl -s http://localhost:32042/check | jq
 ```
 
 
-
-
 노드 헬스체크를 해보자. 5개의 노드(컨트롤1 + 워커4)가 모두 정상이다.
-
-
 
 
 ## 준비사항
@@ -325,10 +317,9 @@ spec:
 kubectl apply --server-side -f ciliumnodeconfig.yaml
 ```
 
+<br>
 
 ### Migration
-
-
 
 #### Cordon and Drain the Node
 
@@ -347,7 +338,7 @@ kubectl cordon $NODE
 
 
 
-- 드레이닝 된 노드에서 실행중인 파드가 없는지 확인한다.  아래 사진의 경우 하나의 파드가 남아있는데 이는 데몬셋의 일부이기 때문이다.
+- 드레이닝 된 노드에서 실행중인 파드가 없는지 확인한다.  아래 사진의 경우 하나의 파드가 남아있는데 이는 데몬셋의 일부이기 때문이다.
 ```bash
 kubectl get pods -o wide --field-selector spec.nodeName=$NODE
 ```
@@ -376,7 +367,7 @@ kubectl -n kube-system rollout status ds/cilium -w
 ```
 
 
-- 이제 해당 노드에 진입해보자. 아까와 다르게 `05-cilium.conflist` 가 생성되었다.  또한 `10-calico.conflist.cilium_bak` 으로 리네이밍된 것을 확인 할 수 있다.(백업 파일 생성)
+- 이제 해당 노드에 진입해보자. 아까와 다르게 `05-cilium.conflist` 가 생성되었다.  또한 `10-calico.conflist.cilium_bak` 으로 리네이밍된 것을 확인 할 수 있다.(백업 파일 생성)
 - 이제 해당 노드의 kubelet은 CNI 프로바이더로 Cilium을 사용 할 수 있다.
 ```bash
 docker exec $NODE ls /etc/cni/net.d/
@@ -398,9 +389,8 @@ kubectl get po -l app.kubernetes.io/instance=nodepinger \ --field-selector spec.
 -  다시 체크해보자.
 ```bash
 kubectl get po -l app.kubernetes.io/instance=nodepinger \ --field-selector spec.nodeName=$NODE -o wide 
-
 ```
-
+<br><br>
 
 #### Cilium 검증
 
@@ -421,7 +411,7 @@ kubectl get ciliumnode kind-worker \ -o jsonpath='{.spec.ipam.podCIDRs[0]}{"\n"}
 
 
 
-
+<br><br>
 #### 남아있는 워커노드에도 같은 작업 반복
 
 ```bash
@@ -451,7 +441,7 @@ kubectl rollout status daemonset nodepinger-goldpinger
 ```bash
 kubectl get po -o wide
 ```
-
+<br><br>
 
 #### 컨트롤 플레인에 대해서도 반복
 
@@ -486,7 +476,7 @@ cilium status --wait
 
 이로써 모든 파드들이 Cilium관리하에 들어왔다. 마이그레이션은 성공적이다.
 
-
+<br><br> 
 ### 클린 업
 
 
@@ -504,10 +494,6 @@ cilium install \
 ```bash
 diff -u --color values-initial.yaml values-final.yaml
 ```
-
-
-
-![[Pasted image 20250717215349.png]]
 
 - 보는바와 같이 노드 구성 값을 disabling하며 Cilium CNI 구성파일을 작성한다.
 - Cilium은 관리되지 않은 파드들을 재시작 할 수 있도록 설정
@@ -528,7 +514,7 @@ cilium status --wait
 ```
 kubectl delete -n kube-system ciliumnodeconfig cilium-default
 ```
-
+<br><br>
 #### 기존의 네트워크 플러그인을 삭제
 
 ```bash
@@ -537,7 +523,7 @@ kubectl delete --force -f https://raw.githubusercontent.com/projectcalico/calico
 kubectl delete --force namespace calico-system
 ```
 
-
+<br><br>
 #### 노드 재시작
 
 - 워커노드를 재시작하자
