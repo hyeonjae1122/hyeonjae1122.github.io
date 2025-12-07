@@ -7,7 +7,7 @@ tags: [cilium,k8s]
 
 # Cilium 간단 요약
 
-![img.png](../assets/1week-arch/1week-2-2.png)
+![img.png](/assets/1week-arch/1week-2-2.png)
 
 ## TL;DR
 1. Cilium Agent runs on each node(DaemonSet)  
@@ -107,7 +107,7 @@ Hubble UI는 릴레이 기반 가시성을 사용하여 그래픽 서비스 의�
 원글
 https://docs.cilium.io/en/stable/overview/component-overview/
 
-![img_1.png](../assets/1week-arch/1week-2-1.png)
+![img_1.png](assets/1week-arch/1week-2-1.png)
 
 ## Agent
 Cilium Agent는 클러스터의 각 노드에서 동작한다.  High-level에서 Agent는k8s또는 API를 통해 네트워킹, 서비스 로드 밸런싱
