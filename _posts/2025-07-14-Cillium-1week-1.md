@@ -99,7 +99,7 @@ networking:
 ```bash
 kubectl get nodes
 ```
-![img.png](../assets/1week-arch/1week1-1.png)
+![img.png](/assets/1week-arch/1week1-1.png)
 
 아래의 명령어로 `Calico` 데몬셋이 제대로 배포 되었는지 확인하자.
 
@@ -115,11 +115,11 @@ kubectl -n calico-system rollout status ds/calico-node
 kubectl get ipamblocks.crd.projectcalico.org \ -o jsonpath="{range .items[*]}{'podNetwork: '}{.spec.cidr}{'\t NodeIP: '}{.spec.affinity}{'\n'}{end}"
 ```
 
-![img_1.png](../assets/1week-arch/1week1-2.png)
+![img_1.png](/assets/1week-arch/1week1-2.png)
 
 노드의 연결상태를 모니터링하기 위해 각 노드당 Goldpinger를 파드를 배포하자.
 
-![img_2.png](../assets/1week-arch/1week1-3.png)
+![img_2.png](/assets/1week-arch/1week1-3.png)
 ```bash
 kubectl rollout status daemonset nodepinger-goldpinger
 kubectl get po -l app.kubernetes.io/instance=nodepinger -o wide
@@ -127,7 +127,7 @@ kubectl get po -l app.kubernetes.io/instance=nodepinger -o wide
 
 현재 컨트롤플레인과 워커노드가 전부 연결 되어 있는 것을 시각적으로 확인 할 수 있다.
 (실습환경 기준)
-![img_3.png](../assets/1week-arch/1week1-4.png)
+![img_3.png](/assets/1week-arch/1week1-4.png)
 
 200상태를 응답하는지 확인해보자.
 
@@ -135,11 +135,11 @@ kubectl get po -l app.kubernetes.io/instance=nodepinger -o wide
 curl -s http://localhost:32042/check | jq
 ```
 
-![img_4.png](../assets/1week-arch/1week1-5.png)
+![img_4.png](/assets/1week-arch/1week1-5.png)
 
 노드 헬스체크를 해보자. 5개의 노드(컨트롤1 + 워커4)가 모두 정상이다.
 
-![img_5.png](../assets/1week-arch/1week1-6.png)
+![img_5.png](/assets/1week-arch/1week1-6.png)
 
 
 **두번째 Goldpinger 배포**
@@ -158,12 +158,12 @@ kubectl expose deployment goldpinger --type NodePort \
 헬스체크  
 `curl -s http://localhost:32043/check | jq`
 
-![img_7.png](../assets/1week-arch/1week1-8.png)
+![img_7.png](/assets/1week-arch/1week1-8.png)
 
 10개 모두 healthy한 것을 볼 수 있다.  
 `curl -s http://localhost:32043/metrics | grep '^goldpinger_nodes_health_total'`
 
-![img_6.png](../assets/1week-arch/1week1-7.png)
+![img_6.png](/assets/1week-arch/1week1-7.png)
 
 ### 파드 CIDR
 
@@ -301,7 +301,7 @@ kubectl get installations.operator.tigera.io default \
   -o jsonpath='{.spec.calicoNetwork.nodeAddressAutodetectionV4}{"\n"}'
 ```
 
-![img_8.png](../assets/1week-arch/1week1-9.png)
+![img_8.png](/assets/1week-arch/1week1-9.png)
 
 patch 명령
 
@@ -315,7 +315,7 @@ kubectl get installations.operator.tigera.io default \
   -o jsonpath='{.spec.calicoNetwork.nodeAddressAutodetectionV4}{"\n"}'
 ```
 
-![img_9.png](../assets/1week-arch/1week1-10.png)
+![img_9.png](/assets/1week-arch/1week1-10.png)
 
 
 
@@ -331,7 +331,7 @@ helm upgrade --install --namespace kube-system cilium cilium/cilium \ --values v
 
 `cilium status --wait` 으로 상태를 확인해보자. Cilium, Operator, Envoy DaemonSet 전부 OK이다. 마이그레이션이 아직 끝나지 않았으므로 Cilium이 관리하는 파드는 아래와 같이 0인것을 확인 할 수 있다.
 
-![img_11.png](../assets/1week-arch/1week1-12.png)
+![img_11.png](/assets/1week-arch/1week1-12.png)
 
 
 
@@ -342,7 +342,7 @@ helm upgrade --install --namespace kube-system cilium cilium/cilium \ --values v
 docker exec kind-worker ls /etc/cni/net.d/
 ```
 
-![img_12.png](../assets/1week-arch/1week1-13.png)
+![img_12.png](/assets/1week-arch/1week1-13.png)
 
 
 ### CiliumNodeConfig
@@ -383,7 +383,7 @@ kubectl get no --show-labels
 아직은 `io.cilium.migration/cilium-default: "true"` 에 매칭되는 라벨이 없다. 아직 실제로 어떤 노드에도 
 적용된 상황은 아니기 때문이다.   
 <br>
-![img_13.png](../assets/1week-arch/1week1-14.png)
+![img_13.png](/assets/1week-arch/1week1-14.png)
 <br>
 
 ### Migration
@@ -403,7 +403,7 @@ kubectl cordon $NODE
 
 `kubectl drain $NODE --ignore-daemonsets` 로 노드를 드레이닝한다. 노드를 드레이닝 할 경우 해당 노드는 자동으로 격리된다.
 
-![img_14.png](../assets/1week-arch/1week1-15.png)
+![img_14.png](/assets/1week-arch/1week1-15.png)
 
 
 
@@ -412,14 +412,14 @@ kubectl cordon $NODE
 kubectl get pods -o wide --field-selector spec.nodeName=$NODE
 ```
 
-![img_15.png](../assets/1week-arch/1week1-16.png)
+![img_15.png](/assets/1week-arch/1week1-16.png)
 
 여전히 5개의 파드를 인식하는지 확인
 ```bash
 curl -s http://localhost:32042/metrics | grep '^goldpinger_nodes_health_total'
 ```
 
-![img_16.png](../assets/1week-arch/1week1-17.png)
+![img_16.png](/assets/1week-arch/1week1-17.png)
 <br><br>
 
 
@@ -439,7 +439,7 @@ kubectl label node $NODE --overwrite "io.cilium.migration/cilium-default=true"
 kubectl -n kube-system delete pod --field-selector spec.nodeName=$NODE -l k8s-app=cilium 
 kubectl -n kube-system rollout status ds/cilium -w
 ```
-![img_17.png](../assets/1week-arch/1week1-18.png)
+![img_17.png](/assets/1week-arch/1week1-18.png)
 
 이제 해당 노드에 진입해보자. 아까와 다르게 `05-cilium.conflist` 가 생성되었다.  또한 `10-calico.conflist.cilium_bak` 으로 리네이밍된 것을 확인 할 수 있다.(백업 파일 생성)
 이제 해당 노드의 kubelet은 CNI 프로바이더로 Cilium을 사용 할 수 있다.
@@ -447,14 +447,14 @@ kubectl -n kube-system rollout status ds/cilium -w
 ```bash
 docker exec $NODE ls /etc/cni/net.d/
 ```
-![img_19.png](../assets/1week-arch/1week1-20.png)
+![img_19.png](/assets/1week-arch/1week1-20.png)
 
 
 그럼 체크해보자.
 ```bash
 kubectl get po -l app.kubernetes.io/instance=nodepinger \ --field-selector spec.nodeName=$NODE -o wide
 ```
-![img_20.png](../assets/1week-arch/1week1-21.png)
+![img_20.png](/assets/1week-arch/1week1-21.png)
 
 아직 `192.168.0.0/16` 대역인 것을 확인할 수 있다.  
 <br><br>
@@ -472,14 +472,14 @@ kubectl get po -l app.kubernetes.io/instance=nodepinger \ --field-selector spec.
 
 ‼ 파드아이피가 바뀐것을 확인 할 수 있다. 이제 `10.244.0.0/16`IP 수신이 가능하다. 
 
-![img_21.png](../assets/1week-arch/1week1-22.png)
+![img_21.png](/assets/1week-arch/1week1-22.png)
 
 연결상태가 양호한지 다시 확인하자.
 
 ```bash
 curl -s http://localhost:32042/metrics | grep '^goldpinger_nodes_health_total'
 ```
-![img_22.png](../assets/1week-arch/1week1-23.png)
+![img_22.png](/assets/1week-arch/1week1-23.png)
 
 #### Cilium 검증
 
@@ -488,7 +488,7 @@ cilium cli로 확인해보자. 아래 사진처럼 Cilium으로 관리되는 파
 cilium status --wait
 ```
 
-![img_23.png](../assets/1week-arch/1week1-24.png)
+![img_23.png](/assets/1week-arch/1week1-24.png)
 
 
 파드 CIDR를 확인 해보자.
@@ -497,7 +497,7 @@ cilium status --wait
 kubectl get ciliumnode kind-worker \ -o jsonpath='{.spec.ipam.podCIDRs[0]}{"\n"}'
 ```
 
-![img_24.png](../assets/1week-arch/1week1-25.png)
+![img_24.png](/assets/1week-arch/1week1-25.png)
 
 이제 노드를 다시 `uncordon`한다.
 ```bash
@@ -514,14 +514,14 @@ kubectl scale deployment goldpinger --replicas 15
 ```bash
 kubectl get po -l app=goldpinger --field-selector spec.nodeName=$NODE -o wide
 ```
-![img_25.png](../assets/1week-arch/1week1-26.png)
+![img_25.png](/assets/1week-arch/1week1-26.png)
 
 배포된 파드에서 모든 ping이 제대로 작동하는지 확인한다.
 
 ```bash
 curl -s http://localhost:32043/metrics | grep '^goldpinger_nodes_health_total'
 ```
-![img_26.png](../assets/1week-arch/1week1-27.png)
+![img_26.png](/assets/1week-arch/1week1-27.png)
 <br><br>
 #### 남아있는 워커노드에도 같은 작업 반복
 
@@ -541,7 +541,7 @@ done
 ```bash
 cilium status --wait
 ```
-![img_27.png](../assets/1week-arch/1week1-28.png)
+![img_27.png](/assets/1week-arch/1week1-28.png)
 
 
 Nodeping DaemonSet 파드는 여전히 이전 파드 CIDR에 존재하므로 모두 다시 시작한다. 
@@ -555,7 +555,7 @@ kubectl rollout status daemonset nodepinger-goldpinger
 kubectl get po -o wide
 ```
 컨트롤 플레인을 제외한 워커노드의 파드들의 IP대역이 바뀐것을 확인할 수 있다. 
-![img_28.png](../assets/1week-arch/1week1-29.png)
+![img_28.png](/assets/1week-arch/1week1-29.png)
 <br><br>
 
 헬스체크
@@ -564,7 +564,7 @@ curl -s http://localhost:32042/metrics | grep '^goldpinger_nodes_health_total'
 curl -s http://localhost:32043/metrics | grep '^goldpinger_nodes_health_total'
 ```
 
-![img_29.png](../assets/1week-arch/1week1-30.png)
+![img_29.png](/assets/1week-arch/1week1-30.png)
 #### 컨트롤 플레인에 대해서도 반복
 
 
@@ -594,7 +594,7 @@ kubectl rollout status daemonset -n calico-system csi-node-driver
 cilium status --wait
 ```
 
-![img_30.png](../assets/1week-arch/1week1-31.png)
+![img_30.png](/assets/1week-arch/1week1-31.png)
 
 
 이로써 모든 파드들이 Cilium관리하에 들어왔다. 마이그레이션은 성공적이다.
@@ -620,7 +620,7 @@ cilium install \
 ```bash
 diff -u --color values-initial.yaml values-final.yaml
 ```
-![img_31.png](../assets/1week-arch/1week1-32.png)
+![img_31.png](/assets/1week-arch/1week1-32.png)
 
 - 보는바와 같이 노드 구성 값을 disabling하며 Cilium CNI 구성파일을 작성한다.
 - Cilium은 관리되지 않은 파드들을 재시작 할 수 있도록 설정
@@ -637,7 +637,7 @@ kubectl -n kube-system rollout restart daemonset cilium
 cilium status --wait
 ```
 
-![img_32.png](../assets/1week-arch/1week1-33.png)
+![img_32.png](/assets/1week-arch/1week1-33.png)
 
 마지막으로 `CiliumNodeConfig` 리소스를 삭제한다.
 ```
@@ -651,7 +651,7 @@ kubectl delete --force -f https://raw.githubusercontent.com/projectcalico/calico
 kubectl delete --force -f https://raw.githubusercontent.com/projectcalico/calico/v3.25.1/manifests/custom-resources.yaml 
 kubectl delete --force namespace calico-system
 ```
-![img_33.png](../assets/1week-arch/1week1-34.png)
+![img_33.png](/assets/1week-arch/1week1-34.png)
 
 <br><br>
 
@@ -683,7 +683,7 @@ Cilium 상태확인
 ```bash
 cilium status --wait
 ```
-![img_34.png](../assets/1week-arch/1week1-35.png)
+![img_34.png](/assets/1week-arch/1week1-35.png)
 데몬셋과 Goldpinger 디플로이먼트를 확인해보자
 
 ```bash
@@ -691,11 +691,11 @@ curl -s http://localhost:32042/metrics | grep '^goldpinger_nodes_health_total' c
 ```
 
 컨트롤 플레인을 재시작 했기 때문에 다운 타임이 발생할 수 있다. (unhealthy)
-![img_35.png](../assets/1week-arch/1week1-36.png)
+![img_35.png](/assets/1week-arch/1week1-36.png)
 
 시간 간격을 좀 두고 확인해보자
 
-![img_36.png](../assets/1week-arch/1week1-37.png)
+![img_36.png](/assets/1week-arch/1week1-37.png)
 
 연결성(connectivity)를 확인하자.
 
@@ -703,6 +703,6 @@ curl -s http://localhost:32042/metrics | grep '^goldpinger_nodes_health_total' c
 cilium connectivity test
 ```
 
-![img.png](../assets/1week-arch/1week1-38.png)
+![img.png](/assets/1week-arch/1week1-38.png)
 
 
