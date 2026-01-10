@@ -1,5 +1,7 @@
 
-1. 리눅스에 VirtualBox 설치하기
+# Prerequisites
+- AMD 아키텍처 리눅스
+- VirtualBox 설치
 
 ```bash
 # 저장소 추가
@@ -17,15 +19,23 @@ sudo apt-get install -y virtualbox-ext-pack
 sudo usermod -aG vboxusers $USER
 ```
 
+- Vagrant 설치
+```bash
+wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
 
-- 트러블 슈팅
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+sudo apt update && sudo apt install vagrant
+```
+
+> 트러블 슈팅
 
 ```bash
 # IP추가
 sudo bash -c 'echo "* 192.168.10.0/24" >> /etc/vbox/networks.conf'
 ```
-	
--  VirtualBox와 KVM 충돌
+
+-  VirtualBox와 KVM 충돌시
 ```bash
 # KVM 모듈 언로드 
 sudo modprobe -r kvm_intel 
@@ -46,21 +56,12 @@ sudo reboot
 ```
 
 
-2. 리눅스에 Vagrant 설치하기
-```bash
-wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+# Vagrant로 가상 머신 프로비저닝 하기
 
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-
-sudo apt update && sudo apt install vagrant
-```
-
-
-3. Vagrant로 가상 머신 프로비저닝 하기
+## Rocky Linux용 init_cfg.sh
 
 ```bash
 # Rocky Linux용 init_cfg.sh 수정
-
 
 #!/usr/bin/env bash
 echo ">>>> Initial Config Start <<<<"
@@ -310,7 +311,7 @@ done < machines.txt
 
 # CA 설정 및 TLS 인증서 생성
 
-```
+```bash
 [req]
 distinguished_name = req_distinguished_name
 prompt             = no                      # CSR 생성 시 대화형 입력 없음
@@ -517,4 +518,69 @@ keyUsage             = critical, digitalSignature, keyEncipherment
 nsCertType           = client
 nsComment            = "Admin Client Certificate"
 subjectKeyIdentifier = hash
+```
+
+
+
+
+# Server 노드에 etcd 서비스 기동
+
+
+```bash
+scp \
+  kubernetes-the-hard-way/downloads/controller/etcd \
+  kubernetes-the-hard-way/downloads/client/etcdctl \
+  units/etcd.service \
+  root@server:~/
+```
+
+
+# Server 노드에 api-server,scheduler,kcm 서비스 기동
+
+
+# node-0
+```bash
+ssh root@node-0
+# EPEL 저장소 활성화 bridge-utils 설치를 위해
+sudo dnf -y install epel-release 
+
+# 
+dnf -y install socat conntrack ipset kmod psmisc bridge-utils
+
+# Disable Swap : Verify if swap is disabled:
+swapon --show
+
+#
+mkdir -p \
+ /etc/cni/net.d \ 
+ /opt/cni/bin \
+ /var/lib/kubelet \ 
+ /var/lib/kube-proxy \
+ /var/lib/kubernetes \
+ /var/run/kubernetes
+```
+
+
+갑자기 되었는데?
+```bash
+# node-1에서
+sudo systemctl status firewalld
+getenforce
+
+# 만약 활성화되어 있으면
+sudo systemctl stop firewalld
+sudo systemctl disable firewalld
+sudo setenforce 0
+
+
+# 재시작
+
+sudo systemctl restart containerd
+sudo systemctl restart kubelet
+sudo systemctl restart kube-proxy
+
+sleep 5
+
+# 상태 확인
+sudo systemctl status kubelet --no-pager | tail -10
 ```
