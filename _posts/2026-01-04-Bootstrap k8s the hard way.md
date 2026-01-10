@@ -197,6 +197,7 @@ vagrant ssh jumpbox
 
 
 머신 상태확인 명렁어 모음
+
 ```bash
 # 사용자 확인
 whoami
@@ -216,6 +217,7 @@ cat /etc/hosts
 ```
 
 `cat /etc/os-release` 를 통하여 `Rock Linux` 임을 확인
+
 ![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T043521888Z.png)
 
 
@@ -372,6 +374,13 @@ kubectl version --client
 
 # SSH 접속 환경 설정
 
+`vagrant ssh jumpbox`
+
+- SSH 접속환경을 설정해준다. 
+	- IP , FQDN, HOST, SUBNET을 설정
+	- 새로운 SSH key를 생성하고 각각 노드에 전달
+	- Hostname 설정 및 ssh 접속 확인
+
 ```bash
 # Machine Database (서버 속성 저장 파일) : IPV4_ADDRESS FQDN HOSTNAME POD_SUBNET
 ## 참고) server(controlplane)는 kubelet 동작하지 않아서, 파드 네트워크 대역 설정 필요 없음
@@ -442,6 +451,44 @@ done < machines.txt
 
 
 # CA 설정 및 TLS 인증서 생성
+
+
+| 항목                      | 개인키                         | CSR                         | 인증서                         | 참고 정보                                                                      | X509v3 Extended Key Usage                              |
+| ----------------------- | --------------------------- | --------------------------- | --------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Root CA                 | ca.key                      | X                           | ca.crt                      |                                                                            |                                                        |
+| admin                   | admin.key                   | admin.csr                   | admin.crt                   | CN = admin, O = system:masters                                             | TLS **Web Client** Authentication                      |
+| node-0                  | node-0.key                  | node-0.csr                  | node-0.crt                  | CN = system:node:node-0, O = system:nodes                                  | TLS **Web** ==**Server**== **/ Client** Authentication |
+| node-1                  | node-1.key                  | node-1.csr                  | node-1.crt                  | CN = system:node:node-1, O = system:nodes                                  | TLS **Web** ==**Server**== **/ Client** Authentication |
+| kube-proxy              | kube-proxy.key              | kube-proxy.csr              | kube-proxy.crt              | CN = system:kube-proxy, O = system:node-proxier                            | TLS **Web** ==Server== / **Client** Authentication     |
+| kube-scheduler          | kube-scheduler.key          | kube-scheduler              | kube-scheduler.crt          | CN = system:kube-scheduler, O = system:kube-scheduler                      | TLS **Web** ==Server== / **Client** Authentication     |
+| kube-controller-manager | kube-controller-manager.key | kube-controller-manager.csr | kube-controller-manager.crt | CN = system:kube-controller-manager, O = system:kube-controller-manager    | TLS **Web** ==Server== / **Client** Authentication     |
+| kube-api-server         | kube-api-server.key         | kube-api-server.csr         | kube-api-server.crt         | CN = kubernetes, SAN: IP(127.0.0.1, ==**10.32.0.1**==), DNS(kubernetes,..) | TLS **Web** ==**Server**== **/ Client** Authentication |
+| service-accounts        | service-accounts.key        | service-accounts.csr        | service-accounts.crt        | CN = service-accounts                                                      | TLS **Web Client** Authentication                      |
+|                         |                             |                             |                             |                                                                            |                                                        |
+
+
+| 항목                  | 네트워크 대역 or IP     |
+| ------------------- | ----------------- |
+| **clusterCIDR**     | 10.200.0.0/16     |
+| → node-0 PodCIDR    | 10.200.0.0/24     |
+| → node-1 PodCIDR    | 10.200.1.0/24     |
+| **ServiceCIDR**     | **10.32.0.0/24**  |
+| → **api clusterIP** | ==**10.32.0.1**== |
+
+`ca.conf`  내용 살펴보기
+
+|구분|역할|
+|---|---|
+|`[req]`|OpenSSL 요청 기본 동작|
+|`[ca_*]`|CA 인증서|
+|`[admin]`|관리자 (kubectl)|
+|`[service-accounts]`|ServiceAccount 토큰 서명|
+|`[node-*]`|워커 노드(kubelet)|
+|`[kube-proxy]`|kube-proxy|
+|`[kube-controller-manager]`|컨트롤러|
+|`[kube-scheduler]`|스케줄러|
+|`[kube-api-server]`|API Server|
+|`[default_req_extensions]`|공통 CSR 옵션|
 
 ```bash
 [req]
