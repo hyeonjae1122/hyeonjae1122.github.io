@@ -33,11 +33,7 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashi
 sudo apt update && sudo apt install vagrant
 ```
 
-
-![](obsidian://notepix/assets/20260110T042706107Z.png)
-
-![](obsidian://notepix/assets/20260110T042615668Z.png)
-
+![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T043005106Z.png)
 
 
 3.  kubelet설치하기
