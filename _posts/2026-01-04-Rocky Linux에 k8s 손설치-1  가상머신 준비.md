@@ -8,7 +8,7 @@
 
 # Prerequisites
 
-- 가상머신 프로비저닝을 위한 VirtualBox 설치
+- 리눅스에 가상머신 프로비저닝을 위한 VirtualBox 설치
 
 ```bash
 # 저장소 추가
