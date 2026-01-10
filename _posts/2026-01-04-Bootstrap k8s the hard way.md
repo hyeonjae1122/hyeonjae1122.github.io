@@ -20,6 +20,7 @@ sudo usermod -aG vboxusers $USER
 ```
 
 - Vagrant 설치
+
 ```bash
 wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
 
@@ -36,6 +37,7 @@ sudo bash -c 'echo "* 192.168.10.0/24" >> /etc/vbox/networks.conf'
 ```
 
 -  VirtualBox와 KVM 충돌시
+
 ```bash
 # KVM 모듈 언로드 
 sudo modprobe -r kvm_intel 
