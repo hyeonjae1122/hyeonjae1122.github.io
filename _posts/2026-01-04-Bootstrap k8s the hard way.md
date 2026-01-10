@@ -34,7 +34,11 @@ sudo apt update && sudo apt install vagrant
 ```
 
 
-![[2026-01-04-Bootstrap k8s the hard way-1.png]]
+![](obsidian://notepix/assets/20260110T042706107Z.png)
+
+![](obsidian://notepix/assets/20260110T042615668Z.png)
+
+
 
 3.  kubelet설치하기
 
