@@ -845,10 +845,228 @@ scp \
   service-accounts.key service-accounts.crt \
   root@server:~  
   
+# 확인
+ssh server ls -l /root
+  
 ```
 
-# API Server와 통신을 위한 Client 인증 설정 파일 작성
+## API Server와 통신을 위한 Client 인증 설정 파일 작성
 
+- `kubelet`  k8s config 파일
+
+```bash
+# apiserver 파드 args 정보
+kubectl describe pod -n kube-system kube-apiserver-myk8s-control-plane
+    Command:
+      kube-apiserver
+      --authorization-mode=Node,RBAC  
+
+
+# Generate a kubeconfig file for the node-0 and node-1 worker nodes
+
+# config set-cluster
+kubectl config set-cluster kubernetes-the-hard-way \
+  --certificate-authority=ca.crt \
+  --embed-certs=true \
+  --server=https://server.kubernetes.local:6443 \
+  --kubeconfig=node-0.kubeconfig && ls -l node-0.kubeconfig && cat node-0.kubeconfig
+
+kubectl config set-cluster kubernetes-the-hard-way \
+  --certificate-authority=ca.crt \
+  --embed-certs=true \
+  --server=https://server.kubernetes.local:6443 \
+  --kubeconfig=node-1.kubeconfig && ls -l node-1.kubeconfig && cat node-1.kubeconfig
+
+# config set-credentials
+kubectl config set-credentials system:node:node-0 \
+  --client-certificate=node-0.crt \
+  --client-key=node-0.key \
+  --embed-certs=true \
+  --kubeconfig=node-0.kubeconfig && cat node-0.kubeconfig
+
+kubectl config set-credentials system:node:node-1 \
+  --client-certificate=node-1.crt \
+  --client-key=node-1.key \
+  --embed-certs=true \
+  --kubeconfig=node-1.kubeconfig && cat node-1.kubeconfig
+  
+# set-context : default 추가
+kubectl config set-context default \
+  --cluster=kubernetes-the-hard-way \
+  --user=system:node:node-0 \
+  --kubeconfig=node-0.kubeconfig && cat node-0.kubeconfig
+
+kubectl config set-context default \
+  --cluster=kubernetes-the-hard-way \
+  --user=system:node:node-1 \
+  --kubeconfig=node-1.kubeconfig && cat node-1.kubeconfig
+
+
+# use-context : current-context 에 default 추가
+kubectl config use-context default \
+  --kubeconfig=node-0.kubeconfig
+
+kubectl config use-context default \
+  --kubeconfig=node-1.kubeconfig
+
+
+#
+ls -l *.kubeconfig
+-rw------- 1 root root 10157 Jan  3 14:55 node-0.kubeconfig
+-rw------- 1 root root 10068 Jan  3 14:50 node-1.kubeconfig
+```
+
+- `kube-proxy` k8s config 파일
+
+```bash
+# Generate a kubeconfig file for the kube-proxy service
+kubectl config set-cluster kubernetes-the-hard-way \
+  --certificate-authority=ca.crt \
+  --embed-certs=true \
+  --server=https://server.kubernetes.local:6443 \
+  --kubeconfig=kube-proxy.kubeconfig
+
+kubectl config set-credentials system:kube-proxy \
+  --client-certificate=kube-proxy.crt \
+  --client-key=kube-proxy.key \
+  --embed-certs=true \
+  --kubeconfig=kube-proxy.kubeconfig
+
+kubectl config set-context default \
+  --cluster=kubernetes-the-hard-way \
+  --user=system:kube-proxy \
+  --kubeconfig=kube-proxy.kubeconfig
+
+kubectl config use-context default \
+  --kubeconfig=kube-proxy.kubeconfig
+
+# 확인
+cat kube-proxy.kubeconfig
+```
+
+- `kube-controller-manager` k8s config 파일
+
+```bash
+# Generate a kubeconfig file for the kube-controller-manager service
+kubectl config set-cluster kubernetes-the-hard-way \
+  --certificate-authority=ca.crt \
+  --embed-certs=true \
+  --server=https://server.kubernetes.local:6443 \
+  --kubeconfig=kube-controller-manager.kubeconfig
+
+kubectl config set-credentials system:kube-controller-manager \
+  --client-certificate=kube-controller-manager.crt \
+  --client-key=kube-controller-manager.key \
+  --embed-certs=true \
+  --kubeconfig=kube-controller-manager.kubeconfig
+
+kubectl config set-context default \
+  --cluster=kubernetes-the-hard-way \
+  --user=system:kube-controller-manager \
+  --kubeconfig=kube-controller-manager.kubeconfig
+
+kubectl config use-context default \
+  --kubeconfig=kube-controller-manager.kubeconfig
+
+# 확인
+cat kube-controller-manager.kubeconfig
+```
+
+- `kube-scheduler` k8s config 파일
+
+```bash
+# Generate a kubeconfig file for the kube-scheduler service
+kubectl config set-cluster kubernetes-the-hard-way \
+  --certificate-authority=ca.crt \
+  --embed-certs=true \
+  --server=https://server.kubernetes.local:6443 \
+  --kubeconfig=kube-scheduler.kubeconfig
+
+kubectl config set-credentials system:kube-scheduler \
+  --client-certificate=kube-scheduler.crt \
+  --client-key=kube-scheduler.key \
+  --embed-certs=true \
+  --kubeconfig=kube-scheduler.kubeconfig
+
+kubectl config set-context default \
+  --cluster=kubernetes-the-hard-way \
+  --user=system:kube-scheduler \
+  --kubeconfig=kube-scheduler.kubeconfig
+
+kubectl config use-context default \
+  --kubeconfig=kube-scheduler.kubeconfig
+
+# 확인
+cat kube-scheduler.kubeconfig
+```
+
+- `admin` k8s config 파일
+
+```bash
+# Generate a kubeconfig file for the admin user
+kubectl config set-cluster kubernetes-the-hard-way \
+  --certificate-authority=ca.crt \
+  --embed-certs=true \
+  --server=https://127.0.0.1:6443 \
+  --kubeconfig=admin.kubeconfig
+
+kubectl config set-credentials admin \
+  --client-certificate=admin.crt \
+  --client-key=admin.key \
+  --embed-certs=true \
+  --kubeconfig=admin.kubeconfig
+
+kubectl config set-context default \
+  --cluster=kubernetes-the-hard-way \
+  --user=admin \
+  --kubeconfig=admin.kubeconfig
+
+kubectl config use-context default \
+  --kubeconfig=admin.kubeconfig
+
+# 확인
+cat admin.kubeconfig
+```
+
+## API Server와 통신을 위한 Client 인증 설정 파일을 서버 및 노드에 전달
+
+- `kubelet` and `kube-proxy` 의 kubeconfig를 `node-0` 및 `node-1`에 복사
+
+```bash
+#
+ls -l *.kubeconfig
+
+
+# kubelet and kube-proxy kubeconfig 파일을 node-0 및 node-1에 복사
+for host in node-0 node-1; do
+  ssh root@${host} "mkdir -p /var/lib/{kube-proxy,kubelet}"
+
+  scp kube-proxy.kubeconfig \
+    root@${host}:/var/lib/kube-proxy/kubeconfig \
+
+  scp ${host}.kubeconfig \
+    root@${host}:/var/lib/kubelet/kubeconfig
+done
+
+# 확인
+ssh node-0 ls -l /var/lib/*/kubeconfig
+ssh node-1 ls -l /var/lib/*/kubeconfig
+
+```
+
+
+- `kube-controller-manager` 및 `kube-scheduler`의  kubeconfig 파일을 server에 복사
+
+```bash
+# kube-controller-manager and kube-scheduler kubeconfig 파일을 server에 복사
+scp admin.kubeconfig \
+  kube-controller-manager.kubeconfig \
+  kube-scheduler.kubeconfig \
+  root@server:~/
+
+# 확인
+ssh server ls -l /root/*.kubeconfig
+```
 
 # Server 노드에 etcd 서비스 기동
 
