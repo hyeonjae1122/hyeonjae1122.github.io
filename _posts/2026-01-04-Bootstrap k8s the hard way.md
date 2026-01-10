@@ -1,6 +1,7 @@
 
+집에 남아도는 `x86_64` 아키텍처의 리눅스 서버로 Rocky Linux 환경으로 실습을 진행 하였습니다. 
 # Prerequisites
-- AMD 아키텍처 리눅스
+
 - VirtualBox 설치
 
 ```bash
@@ -60,7 +61,10 @@ sudo reboot
 
 # Vagrant로 가상 머신 프로비저닝 하기
 
-## Rocky Linux용 init_cfg.sh
+#### Rocky Linux용 init_cfg.sh
+
+[init_cfg.sh 다운로드 Link](https://raw.githubusercontent.com/hyeonjae1122/Vagrant-for-Rocky-Linux/refs/heads/main/init_cfg.sh)
+
 
 ```bash
 # Rocky Linux용 init_cfg.sh 수정
@@ -108,6 +112,18 @@ cat << EOF >> /etc/hosts
 EOF
 
 echo ">>>> Initial Config End <<<<"
+```
+
+
+#### Rockylinux 이미지와 버전정보
+
+[Vagrantfile 다운로드 Link](https://raw.githubusercontent.com/hyeonjae1122/Vagrant-for-Rocky-Linux/6e1e2864c76485eeb20b34f93dcdcfdbec5f1d9e/Vagrant)
+
+[Box Link](https://portal.cloud.hashicorp.com/vagrant/discover/bento/rockylinux-9)
+
+```bash
+BOX_IMAGE = "bento/rockylinux-9"
+BOX_VERSION = "202510.26.0"
 ```
 
 
