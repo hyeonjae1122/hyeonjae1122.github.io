@@ -2,11 +2,15 @@
 
 ## kubelet-config 파일 작성 및 워커노드에 전달
 
+- 설정 파일 확인
 ```bash
-# cni(bridge) 파일과 kubelet-config 파일 작성 및 node-0/1에 전달
 cat configs/10-bridge.conf | jq
-cat configs/kubelet-config.yaml | yq # clusterDomain , clusterDNS 없어도 smoke test 까지 잘됨 -> 실습에서 coredns 미사용
+cat configs/kubelet-config.yaml | yq 
+```
 
+- 노드별 설정 파일 생성 및 전송
+
+```bash
 for HOST in node-0 node-1; do
   SUBNET=$(grep ${HOST} machines.txt | cut -d " " -f 4)
   sed "s|SUBNET|$SUBNET|g" \
@@ -26,19 +30,26 @@ ssh node-1 ls -l /root
 ```
 
 
+## 바이너리 및 설정 파일 전송
 
-## 워커노드에 파일 전달
+- 전송 할 파일 목록
 
 ```bash
-# 파일 확인 및 node-0/1에 전달
-cat configs/99-loopback.conf ; echo
-cat configs/containerd-config.toml ; echo
-cat configs/kube-proxy-config.yaml ; echo
+downloads/worker/*           # kubelet, kube-proxy, crictl, runc 등 바이너리
+downloads/client/kubectl     # kubectl 명령어 도구
+downloads/cni-plugins/*      # flannel, vxlan 등 CNI 플러그인
+configs/99-loopback.conf     # 루프백 네트워크 설정
+configs/containerd-config.toml # 컨테이너 런타임 설정
+configs/kube-proxy-config.yaml # 프록시 설정
+units/containerd.service     # systemd 서비스 파일
+units/kubelet.service        # systemd 서비스 파일
+units/kube-proxy.service     # systemd 서비스 파일
+```
 
-cat units/containerd.service
-cat units/kubelet.service
-cat units/kube-proxy.service
 
+- 모든 노드에 병렬 전송
+
+```bash
 for HOST in node-0 node-1; do
   scp \
     downloads/worker/* \
@@ -81,6 +92,7 @@ dnf -y install socat conntrack ipset kmod psmisc bridge-utils
 # Disable Swap : Verify if swap is disabled:
 swapon --show
 
+# 필요한 디렉토리 생성
 mkdir -p \
   /etc/cni/net.d \
   /opt/cni/bin \
@@ -89,36 +101,42 @@ mkdir -p \
   /var/lib/kubernetes \
   /var/run/kubernetes
 
-# Install the worker binaries:
+# 바이너리 설치
 mv crictl kube-proxy kubelet runc /usr/local/bin/
 mv containerd containerd-shim-runc-v2 containerd-stress /bin/
 mv cni-plugins/* /opt/cni/bin/
 
 
-# Configure CNI Networking
-
-## Create the bridge network configuration file:
+# CNI 네트워크 설정
 mv 10-bridge.conf 99-loopback.conf /etc/cni/net.d/
 cat /etc/cni/net.d/10-bridge.conf 
 
-## To ensure network traffic crossing the CNI bridge network is processed by iptables, load and configure the br-netfilter kernel module:
+# br-netfilter 모듈 활성화
+# Pod 간 통신이 iptables 방화벽 규칙을 우회하지 않도록 강제
 lsmod | grep netfilter
 modprobe br-netfilter
 echo "br-netfilter" >> /etc/modules-load.d/modules.conf
 lsmod | grep netfilter
 
+# iptables가 브릿지 트래픽을 처리하도록 설정
 echo "net.bridge.bridge-nf-call-iptables = 1"  >> /etc/sysctl.d/kubernetes.conf
 echo "net.bridge.bridge-nf-call-ip6tables = 1" >> /etc/sysctl.d/kubernetes.conf
 sysctl -p /etc/sysctl.d/kubernetes.conf
 
 
-# Configure containerd : Install the containerd configuration files:
+# containerd 설정
 mkdir -p /etc/containerd/
 mv containerd-config.toml /etc/containerd/config.toml
 mv containerd.service /etc/systemd/system/
 cat /etc/containerd/config.toml ; echo
-version = 2
 
+```
+
+
+- containerd-config.toml 주요 설정
+```bash
+cat /etc/containerd/config.toml ; echo
+version = 2
 [plugins."io.containerd.grpc.v1.cri"]               # CRI 플러그인 활성화 : kubelet은 이 플러그인을 통해 containerd와 통신
   [plugins."io.containerd.grpc.v1.cri".containerd]  # containerd 기본 런타임 설정
     snapshotter = "overlayfs"                       # 컨테이너 파일시스템 레이어 관리 방식 : Linux표준/성능최적
@@ -130,11 +148,15 @@ version = 2
 [plugins."io.containerd.grpc.v1.cri".cni]           # CNI 설정
   bin_dir = "/opt/cni/bin"                          # CNI 플러그인 바이너리 위치
   conf_dir = "/etc/cni/net.d"                       # CNI 네트워크 설정 파일 위치
+```
 
+
+
+``` bash
 # kubelet ↔ containerd 연결 Flow
 kubelet
   ↓ CRI (gRPC)
-unix:///var/run/containerd/containerd.sock
+containerd.sock(unix:///var/run/containerd/containerd.sock)
   ↓
 containerd CRI plugin
   ↓
@@ -143,7 +165,7 @@ runc
 Linux namespaces / cgroups
 
 
-# Configure the Kubelet : Create the kubelet-config.yaml configuration file:
+# kubelet 설정
 mv kubelet-config.yaml /var/lib/kubelet/
 mv kubelet.service /etc/systemd/system/
 
