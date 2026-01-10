@@ -1068,20 +1068,324 @@ scp admin.kubeconfig \
 ssh server ls -l /root/*.kubeconfig
 ```
 
+
+# 데이터 암호화 config 및 key생성
+
+```bash
+# The Encryption Key
+
+# Generate an encryption key
+export ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64)
+echo $ENCRYPTION_KEY
+JMnUP1PUUORZE9iadPdzYifnvPVIniSzOW6NUoMofVc=
+
+
+# The Encryption Config File
+
+# Create the encryption-config.yaml encryption config file
+# (참고) 실제 etcd 값에 기록되는 헤더 : k8s:enc:aescbc:v1:key1:<ciphertext>
+cat configs/encryption-config.yaml
+kind: EncryptionConfiguration           # kube-apiserver가 etcd에 저장할 리소스를 어떻게 암호화할지 정의
+apiVersion: apiserver.config.k8s.io/v1  # --encryption-provider-config 플래그로 참조
+resources:
+  - resources:
+      - secrets                         # 암호화 대상 Kubernetes 리소스 : 여기서는 Secret 리소스만 암호화
+    providers:                          # 지원 providers(위 부터 적용됨) : identity, aescbc, aesgcm, kms v2, secretbox
+      - aescbc:                         # etcd에 저장될 Secret을 AES-CBC 방식으로 암호화
+          keys:
+            - name: key1                # 키 식별자 (etcd 데이터에 기록됨)
+              secret: ${ENCRYPTION_KEY}
+      - identity: {}                    # 암호화하지 않음 (Plaintext), 주로 하위 호환성 / 점진적 암호화 목적
+# aescbc를 첫 번째에, identity를 두 번째에 배치하는 것은 "새로운 데이터는 무조건 암호화해서 저장하되, 이전에 평문으로 저장되었던 데이터도 문제없이 읽어 들이겠다"는 하위 호환성 전략을 의미
+# 설명 출처 : https://yyeon2.medium.com/bootstrap-kubernetes-the-hard-way-48644e868550
+
+envsubst < configs/encryption-config.yaml > encryption-config.yaml
+cat encryption-config.yaml
+
+# Copy the encryption-config.yaml encryption config file to each controller instance:
+scp encryption-config.yaml root@server:~/
+ssh server ls -l /root/encryption-config.yaml
+
+```
+
+
+
 # Server 노드에 etcd 서비스 기동
 
 
 ```bash
+# Prerequisites
+
+# hostname 변경 : controller -> server
+# http 평문 통신!
+# Each etcd member must have a unique name within an etcd cluster. 
+# Set the etcd name to match the hostname of the current compute instance:
+cat units/etcd.service | grep controller
+
+ETCD_NAME=server
+cat > units/etcd.service <<EOF
+[Unit]
+Description=etcd
+Documentation=https://github.com/etcd-io/etcd
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/etcd \\
+  --name ${ETCD_NAME} \\
+  --initial-advertise-peer-urls http://127.0.0.1:2380 \\
+  --listen-peer-urls http://127.0.0.1:2380 \\
+  --listen-client-urls http://127.0.0.1:2379 \\
+  --advertise-client-urls http://127.0.0.1:2379 \\
+  --initial-cluster-token etcd-cluster-0 \\
+  --initial-cluster ${ETCD_NAME}=http://127.0.0.1:2380 \\
+  --initial-cluster-state new \\
+  --data-dir=/var/lib/etcd
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+cat units/etcd.service | grep server
+
+# Copy etcd binaries and systemd unit files to the server machine
 scp \
-  kubernetes-the-hard-way/downloads/controller/etcd \
-  kubernetes-the-hard-way/downloads/client/etcdctl \
+  downloads/controller/etcd \
+  downloads/client/etcdctl \
   units/etcd.service \
   root@server:~/
 ```
 
 
-# Server 노드에 api-server,scheduler,kcm 서비스 기동
+```bash
+ssh root@server
+-------------------------------------------------------------------
+# Bootstrapping an etcd Cluster
 
+# Install the etcd Binaries
+# Extract and install the etcd server and the etcdctl command line utility
+pwd
+mv etcd etcdctl /usr/local/bin/
+
+# Configure the etcd Server
+mkdir -p /etc/etcd /var/lib/etcd
+chmod 700 /var/lib/etcd
+cp ca.crt kube-api-server.key kube-api-server.crt /etc/etcd/
+
+# Create the etcd.service systemd unit file:
+mv etcd.service /etc/systemd/system/
+tree /etc/systemd/system/
+
+# Start the etcd Server
+systemctl daemon-reload
+systemctl enable etcd
+systemctl start etcd
+
+# 확인
+systemctl status etcd --no-pager
+ss -tnlp | grep etcd
+```
+
+![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T150247881Z.png)
+
+
+
+```bash
+
+# etcd 클러스터 멤버를 리스트화 하여 확인
+etcdctl member list
+etcdctl member list -w table
+etcdctl endpoint status -w table
+
+exit
+```
+
+![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T150359780Z.png)
+
+# k8s 컨트롤 플레인 부트스트래핑
+
+## server 노드에 ‘api server, scheduler, kcm 서비스 기동
+
+| 항목               | 네트워크 대역 or IP     |
+| ---------------- | ----------------- |
+| **clusterCIDR**  | **10.200.0.0/16** |
+| → node-0 PodCIDR | 10.200.0.0/24     |
+| → node-1 PodCIDR | 10.200.1.0/24     |
+| **ServiceCIDR**  | **10.32.0.0/24**  |
+| → api clusterIP  | 10.32.0.1         |
+
+### kube-apiserver.service 기동
+
+```bash
+# Prerequisites
+
+# kube-apiserver.service 수정 : service-cluster-ip-range 추가
+# https://github.com/kelseyhightower/kubernetes-the-hard-way/issues/905
+# service-cluster-ip 값은 ca.conf 에 설정한 [kube-api-server_alt_names] 항목의 Service IP 범위
+cat ca.conf | grep '\[kube-api-server_alt_names' -A2
+[kube-api-server_alt_names]
+IP.0  = 127.0.0.1
+IP.1  = 10.32.0.1
+
+cat units/kube-apiserver.service
+cat << EOF > units/kube-apiserver.service
+[Unit]
+Description=Kubernetes API Server
+Documentation=https://github.com/kubernetes/kubernetes
+
+[Service]
+ExecStart=/usr/local/bin/kube-apiserver \\
+  --allow-privileged=true \\
+  --apiserver-count=1 \\
+  --audit-log-maxage=30 \\
+  --audit-log-maxbackup=3 \\
+  --audit-log-maxsize=100 \\
+  --audit-log-path=/var/log/audit.log \\
+  --authorization-mode=Node,RBAC \\
+  --bind-address=0.0.0.0 \\
+  --client-ca-file=/var/lib/kubernetes/ca.crt \\
+  --enable-admission-plugins=NamespaceLifecycle,NodeRestriction,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota \\
+  --etcd-servers=http://127.0.0.1:2379 \\
+  --event-ttl=1h \\
+  --encryption-provider-config=/var/lib/kubernetes/encryption-config.yaml \\
+  --kubelet-certificate-authority=/var/lib/kubernetes/ca.crt \\
+  --kubelet-client-certificate=/var/lib/kubernetes/kube-api-server.crt \\
+  --kubelet-client-key=/var/lib/kubernetes/kube-api-server.key \\
+  --runtime-config='api/all=true' \\
+  --service-account-key-file=/var/lib/kubernetes/service-accounts.crt \\
+  --service-account-signing-key-file=/var/lib/kubernetes/service-accounts.key \\
+  --service-account-issuer=https://server.kubernetes.local:6443 \\
+  --service-cluster-ip-range=10.32.0.0/24 \\
+  --service-node-port-range=30000-32767 \\
+  --tls-cert-file=/var/lib/kubernetes/kube-api-server.crt \\
+  --tls-private-key-file=/var/lib/kubernetes/kube-api-server.key \\
+  --v=2
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+cat units/kube-apiserver.service
+```
+
+
+```bash
+cat configs/kube-apiserver-to-kubelet.yaml ; echo
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"  # Kubernetes가 업그레이드 시 자동 관리
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+  name: system:kube-apiserver-to-kubelet
+rules:
+  - apiGroups:
+      - ""                                               # Core API group (v1) : Node 관련 서브리소스는 core group에 속함
+    resources:                                           # 아래 처럼, kubelet API 대부분을 포괄
+      - nodes/proxy                                      ## apiserver → kubelet 프록시 통신
+      - nodes/stats                                      ## 노드/파드 리소스 통계 (cAdvisor)
+      - nodes/log                                        ## metrics-server / top 명령
+      - nodes/spec                                       ## kubectl logs
+      - nodes/metrics                                    ## metrics-server / top 명령
+    verbs:
+      - "*"                                              # 대상은 “nodes 하위 리소스”로 한정 + 모든 동작 허용 (get, list, watch, create, proxy 등)
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:kube-apiserver                            # 누가 이 권한을 쓰는가? → kube-apiserver 자신
+  namespace: ""
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:kube-apiserver-to-kubelet
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: kubernetes                         # 사용자 kubernetes ,이 사용자는 kube-apiserver가 사용하는 클라이언트 인증서의 CN
+
+# api-server : Subject CN 확인
+openssl x509 -in kube-api-server.crt -text -noout
+        Subject: CN = kubernetes,
+
+# api -> kubelet 호출 시 Flow
+kube-apiserver (client)
+  |
+  | (TLS client cert, CN=kubernetes)
+  ↓
+kubelet API Server 역할 (/stats, /log, /metrics)
+  |
+  ↓
+RBAC 평가:
+  User = kubernetes
+  → ClusterRoleBinding system:kube-apiserver 매칭
+  → ClusterRole system:kube-apiserver-to-kubelet 권한 부여
+
+
+# kube-scheduler
+cat units/kube-scheduler.service ; echo
+cat configs/kube-scheduler.yaml ; echo
+
+
+# kube-controller-manager : cluster-cidr 는 POD CIDR 포함하는 대역, service-cluster-ip-range 는 apiserver 설정 값 동일 설정.
+cat units/kube-controller-manager.service ; echo
+[Unit]
+Description=Kubernetes Controller Manager
+Documentation=https://github.com/kubernetes/kubernetes
+
+[Service]
+ExecStart=/usr/local/bin/kube-controller-manager \
+  --bind-address=0.0.0.0 \
+  --cluster-cidr=10.200.0.0/16 \
+  --cluster-name=kubernetes \
+  --cluster-signing-cert-file=/var/lib/kubernetes/ca.crt \
+  --cluster-signing-key-file=/var/lib/kubernetes/ca.key \
+  --kubeconfig=/var/lib/kubernetes/kube-controller-manager.kubeconfig \
+  --root-ca-file=/var/lib/kubernetes/ca.crt \
+  --service-account-private-key-file=/var/lib/kubernetes/service-accounts.key \
+  --service-cluster-ip-range=10.32.0.0/24 \
+  --use-service-account-credentials=true \
+  --v=2
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
+```
+
+server(컨트롤 플레인)으로 아래 리스트를 복사한다.
+- kube-apiserver 바이너리 파일
+- kube-controller-manager 바이너리 파일
+- kube-scheduler 바이너리파일
+- kubectl 바이너리 파일
+- kube-apiserver.service
+- kube-controller-manager.service
+- kube-scheduler.service
+- kube-scheduler.yaml
+- kube-apiserver-to-kubelet.yaml : kube-apiserver가 kubelet(Node)에 접근할 수 있도록 허용하는 '시스템 내부용 RBAC' 설정 파일
+
+```bash
+scp \
+  downloads/controller/kube-apiserver \
+  downloads/controller/kube-controller-manager \
+  downloads/controller/kube-scheduler \
+  downloads/client/kubectl \
+  units/kube-apiserver.service \
+  units/kube-controller-manager.service \
+  units/kube-scheduler.service \
+  configs/kube-scheduler.yaml \
+  configs/kube-apiserver-to-kubelet.yaml \
+  root@server:~/
+
+# 확인
+ssh server ls -l /root
+
+```
+
+### kubectl 확인
 
 # node-0
 ```bash
