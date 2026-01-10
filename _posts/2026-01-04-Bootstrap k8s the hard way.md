@@ -124,10 +124,10 @@ systemctl restart sshd >/dev/null 2>&1
 echo "[TASK 7] Setting Local DNS Using Hosts file"
 sed -i '/^127\.0\.\(1\|2\)\.1/d' /etc/hosts
 cat << EOF >> /etc/hosts
-192.168.56.10  jumpbox
-192.168.56.100 server.kubernetes.local server
-192.168.56.101 node-0.kubernetes.local node-0
-192.168.56.102 node-1.kubernetes.local node-1
+192.168.10.10  jumpbox
+192.168.10.100 server.kubernetes.local server
+192.168.10.101 node-0.kubernetes.local node-0
+192.168.10.102 node-1.kubernetes.local node-1
 EOF
 
 echo ">>>> Initial Config End <<<<"
@@ -182,6 +182,7 @@ vagrant box list
 # 배포된 가상머신 확인
 vagrant status
 ```
+
 아래와 같이 예상대로 4대의 가상머신이 배포된 것을 확인할 수 있다.
 
 ![|600x150](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T043413999Z.png)
@@ -364,6 +365,7 @@ cp downloads/client/kubectl /usr/local/bin/
 ![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T122637566Z.png)
 
 kubectl 버전 확인
+
 ```sh
 kubectl version --client
 ```
@@ -380,6 +382,7 @@ kubectl version --client
 	- IP , FQDN, HOST, SUBNET을 설정
 	- 새로운 SSH key를 생성하고 각각 노드에 전달
 	- Hostname 설정 및 ssh 접속 확인
+
 
 ```bash
 # Machine Database (서버 속성 저장 파일) : IPV4_ADDRESS FQDN HOSTNAME POD_SUBNET
@@ -452,6 +455,7 @@ done < machines.txt
 
 # CA 설정 및 TLS 인증서 생성
 
+- 총 9개의 항목에 대해 개인키 및 인증서를 생성한다. 
 
 | 항목                      | 개인키                         | CSR                         | 인증서                         | 참고 정보                                                                      | X509v3 Extended Key Usage                              |
 | ----------------------- | --------------------------- | --------------------------- | --------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------ |
@@ -477,18 +481,18 @@ done < machines.txt
 
 `ca.conf`  내용 살펴보기
 
-|구분|역할|
-|---|---|
-|`[req]`|OpenSSL 요청 기본 동작|
-|`[ca_*]`|CA 인증서|
-|`[admin]`|관리자 (kubectl)|
-|`[service-accounts]`|ServiceAccount 토큰 서명|
-|`[node-*]`|워커 노드(kubelet)|
-|`[kube-proxy]`|kube-proxy|
-|`[kube-controller-manager]`|컨트롤러|
-|`[kube-scheduler]`|스케줄러|
-|`[kube-api-server]`|API Server|
-|`[default_req_extensions]`|공통 CSR 옵션|
+| 구분                          | 역할                   |
+| --------------------------- | -------------------- |
+| `[req]`                     | OpenSSL 요청 기본 동작     |
+| `[ca_*]`                    | CA 인증서               |
+| `[admin]`                   | 관리자 (kubectl)        |
+| `[service-accounts]`        | ServiceAccount 토큰 서명 |
+| `[node-*]`                  | 워커 노드(kubelet)       |
+| `[kube-proxy]`              | kube-proxy           |
+| `[kube-controller-manager]` | 컨트롤러                 |
+| `[kube-scheduler]`          | 스케줄러                 |
+| `[kube-api-server]`         | API Server           |
+| `[default_req_extensions]`  | 공통 CSR 옵션            |
 
 ```bash
 [req]
@@ -699,7 +703,151 @@ nsComment            = "Admin Client Certificate"
 subjectKeyIdentifier = hash
 ```
 
+## 각 컴포넌트별 개인키 , CSR, 인증서 생성
 
+```bash
+# Root CA 개인키
+openssl genrsa -out ca.key 4096
+openssl req -x509 -new -sha512 -noenc \
+  -key ca.key -days 3653 \
+  -config ca.conf \
+  -out ca.crt
+  
+# Create Client and Server Certificates : admin
+openssl genrsa -out admin.key 4096
+openssl req -new -key admin.key -sha256 \
+  -config ca.conf -section admin \
+  -out admin.csr
+
+openssl x509 -req -days 3653 -in admin.csr \
+  -copy_extensions copyall \
+  -sha256 -CA ca.crt \
+  -CAkey ca.key \
+  -CAcreateserial \
+  -out admin.crt  
+  
+# Create Client and Server Certificates: 나머지
+certs=( "node-0" "node-1" "kube-proxy" "kube-scheduler" "kube-controller-manager" "kube-api-server" "service-accounts" )
+
+# 확인 
+echo ${certs[*]}
+
+# 개인키 생성, csr 생성, 인증서 생성 
+for i in ${certs[*]}; do
+openssl genrsa -out "${i}.key" 4096
+
+openssl req -new -key "${i}.key" -sha256 \
+-config "ca.conf" -section ${i} \
+-out "${i}.csr"
+
+openssl x509 -req -days 3653 -in "${i}.csr" \
+-copy_extensions copyall \
+-sha256 -CA "ca.crt" \
+-CAkey "ca.key" \
+-CAcreateserial \
+-out "${i}.crt"
+done
+
+```
+
+생성된 개인키 , csr, 인증서 확인
+
+```bash
+ls -1 *.crt *.key *.csr
+
+admin.crt
+admin.csr
+admin.key
+ca.crt
+ca.key
+kube-api-server.crt
+kube-api-server.csr
+kube-api-server.key
+kube-controller-manager.crt
+kube-controller-manager.csr
+kube-controller-manager.key
+kube-proxy.crt
+kube-proxy.csr
+kube-proxy.key
+kube-scheduler.crt
+kube-scheduler.csr
+kube-scheduler.key
+node-0.crt
+node-0.csr
+node-0.key
+node-1.crt
+node-1.csr
+node-1.key
+service-accounts.crt
+service-accounts.csr
+service-accounts.key
+```
+
+인증서 / 개인키 , csr 정보 를 확인
+
+```bash
+# 각종 key 확인
+openssl rsa -in ca.key -text -noout
+openssl rsa -in admin.key -text -noout
+openssl rsa -in node-0.key -text -noout
+openssl rsa -in node-1.key -text -noout
+openssl rsa -in kube-proxy.key -text -noout
+openssl rsa -in kube-scheduler.key -text -noout
+openssl rsa -in kube-controller-manager.key -text -noout
+openssl rsa -in kube-api-server.key -text -noout
+openssl rsa -in service-accounts.key -text -noout
+
+#각종 csr 확인
+# Root CA 인증서 생성하였으므로(Self-Signed certificate) 없음
+openssl req -in admin.csr -text -noout
+openssl req -in node-0.csr -text -noout
+openssl req -in node-1.csr -text -noout
+openssl req -in kube-proxy.csr -text -noout
+openssl req -in kube-scheduler.csr -text -noout
+openssl req -in kube-controller-manager.csr -text -noout
+openssl req -in kube-api-server.csr -text -noout
+openssl req -in service-accounts.csr -text -noout
+
+# 각종 인증서 확인
+openssl x509 -in ca.crt -text -noout
+openssl x509 -in admin.crt -text -noout
+openssl x509 -in node-0.crt -text -noout
+openssl x509 -in node-1.crt -text -noout
+openssl x509 -in kube-proxy.crt -text -noout
+openssl x509 -in kube-scheduler.crt -text -noout
+openssl x509 -in kube-controller-manager.crt -text -noout
+openssl x509 -in kube-api-server.crt -text -noout
+openssl x509 -in service-accounts.crt -text -noout
+```
+
+## node-0 , node-1에 클라이언트 및 서버 증명서 전달
+
+```bash
+for host in node-0 node-1; do
+ssh root@${host} mkdir /var/lib/kubelet/
+
+scp ca.crt root@${host}:/var/lib/kubelet/
+scp ${host}.crt \
+ root@${host}:/var/lib/kubelet/kubelet.crt
+
+scp ${host}.key \
+  root@${host}:/var/lib/kubelet/kubelet.key
+done
+
+# 확인
+ssh node-0 ls -l /var/lib/kubelet 
+ssh node-1 ls -l /var/lib/kubelet
+
+# 서버머신에 적절한 개인키 및 증명서를 전달
+scp \ 
+  ca.key ca.crt \
+  kube-api-server.key kube-api-server.crt \
+  service-accounts.key service-accounts.crt \
+  root@server:~  
+  
+```
+
+# API Server와 통신을 위한 Client 인증 설정 파일 작성
 
 
 # Server 노드에 etcd 서비스 기동
