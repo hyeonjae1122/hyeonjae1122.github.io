@@ -164,24 +164,39 @@ BOX_VERSION = "202510.26.0"
 배포 명령어 실행
 
 ```bash
-# 배포
-vagrant up
+ls -al
+-rw-rw-r-- 1 hyeonjae hyeonjae 3073 Jan 10 18:01 vagrantfile
 
+vagrant up
+```
+
+```bash
 # 실습용 OS 이미지 자동 다운로드 확인
 vagrant box list
+```
 
+![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T112658778Z.png)
+
+
+```
 # 배포된 가상머신 확인
 vagrant status
 ```
-
 아래와 같이 예상대로 4대의 가상머신이 배포된 것을 확인할 수 있다.
 
 ![|600x150](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T043413999Z.png)
 
 
+#### jumpbox 가상머신접속
+
+jumpbox에 ssh접속을 위한 명령어이다. 아주 많이 쓰이는 명렁어이므로 익숙해지자.
+
+```ssh
+vagrant ssh jumpbox
+```
 
 
-
+머신 상태확인 명렁어 모음
 ```bash
 # 사용자 확인
 whoami
@@ -200,54 +215,93 @@ cat /etc/hosts
 
 ```
 
+`cat /etc/os-release` 를 통하여 `Rock Linux` 임을 확인
 ![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T043521888Z.png)
 
 
-```bash
-whoami
-root
+필요한 각종 Tool을 설치한다. 기본 저장소에 없는 패키지들도 있으니 `epel-release`를 추가하자.
 
+```bash
 # Tool Install
+## EPEL = Extra Packages for Enterprise Linux**
+### Rocky Linux(RHEL 기반)의 **기본 저장소에 없는 추가 패키지들을 제공하는 저장소
+
+dnf -y install epel-release 
 dnf install tree git jq yq unzip vim sshpass -y
 
-pwd
+# Installed:
+#  git-2.47.3-1.el9_6.x86_64                     git-core-2.47.3-1.el9_6.x86_64
+#  git-core-doc-2.47.3-1.el9_6.noarch            perl-DynaLoader-1.47-481.1.el9_6.x86_64
+#  perl-Error-1:0.17029-7.el9.0.1.noarch         perl-File-Find-1.37-481.1.el9_6.noarch
+#  perl-Git-2.47.3-1.el9_6.noarch                perl-TermReadKey-2.38-11.el9.x86_64
+#  perl-lib-0.65-481.1.el9_6.x86_64              sshpass-1.09-4.el9.x86_64
+#  yq-4.47.1-2.el9.x86_64
+# Complete!
+```
+
+
+k8s hardway에 필요한 리소스를 다운 받기 위해 아래 레포지토리를 클론하자. 
+```bash
+# Sync GitHub Repository ## --depth 1 : 최신 커밋만 가져오는 shallow clone을 의미
 git clone --depth 1 https://github.com/kelseyhightower/kubernetes-the-hard-way.git
 
 cd kubernetes-the-hard-way
-tree
-pwd
+```
 
+아키텍처 확인
+
+```bash
 # CPU 아키텍처 확인 
-uname -m
-uname -a
+uname -m # x86_64
+uname -a # Linux jumpbox 5.14.0-570.52.1.el9_6.x86_64 #1 SMP PREEMPT_DYNAMIC Wed Oct 15 13:59:22 UTC 2025 x86_64 x86_64 x86_64 GNU/Linux
+```
 
-# # Download Kubernetes
-# https://www.downloadkubernetes.com/
-vi downloads-amd64-latest.txt
-# https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-scheduler
-# https://dl.k8s.io/v1.34.2/bin/linux/amd64/kubectl
-# https://dl.k8s.io/v1.34.2/bin/linux/amd64/kubelet
-# https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-apiserver
-# https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-controller-manager
-# https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-proxy
-# https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.34.0/crictl-v1.34.0-linux-amd64.tar.gz
-# https://github.com/opencontainers/runc/releases/download/v1.4.0/runc.amd64
+레포지토리 파일 내용 확인
 
- # https://github.com/containernetworking/plugins/releases/download/v1.8.0/cni-plugins-linux-amd64-v1.8.0.tgz
+```bash
+cd kubernetes-the-hard-way
 
- # https://github.com/containerd/containerd/releases/download/v2.1.5/containerd-2.1.5-linux-amd64.tar.gz
+ls -al
+total 60
+drwxr-xr-x. 6 root root  4096 Jan 10 20:52 .
+dr-xr-x---. 4 root root   150 Jan 10 20:52 ..
+-rw-r--r--. 1 root root  5863 Jan 10 20:40 ca.conf
+drwxr-xr-x. 2 root root  4096 Jan 10 20:40 configs
+-rw-r--r--. 1 root root  1059 Jan 10 20:40 CONTRIBUTING.md
+-rw-r--r--. 1 root root   407 Jan 10 20:40 COPYRIGHT.md
+drwxr-xr-x. 2 root root  4096 Jan 10 20:40 docs
+-rw-r--r--. 1 root root   839 Jan 10 20:40 downloads-amd64.txt
+-rw-r--r--. 1 root root   839 Jan 10 20:40 downloads-arm64.txt
+drwxr-xr-x. 8 root root   178 Jan 10 20:40 .git
+-rw-r--r--. 1 root root  1167 Jan 10 20:40 .gitignore
+-rw-r--r--. 1 root root 11358 Jan 10 20:40 LICENSE
+-rw-r--r--. 1 root root  2624 Jan 10 20:40 README.md
+drwxr-xr-x. 2 root root  4096 Jan 10 20:40 units
+```
 
- # https://github.com/etcd-io/etcd/releases/download/v3.5.26/etcd-v3.5.26-linux-amd64.tar.gz
+k8s 구성을 위한 컴포넌트 다운로드한다. 위에서 다운로드한 레포지토리에 있는 바이너리 파일들의 링크는 버전이 낮으므로 아래와 같이 1.34버전에 맞춰준다.
 
+[쿠버네티스 다운로드 공식 링크] (https://www.downloadkubernetes.com/)
+
+```sh
+cat > downloads-amd64.txt << 'EOF' https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-scheduler https://dl.k8s.io/v1.34.2/bin/linux/amd64/kubectl https://dl.k8s.io/v1.34.2/bin/linux/amd64/kubelet https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-apiserver https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-controller-manager https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-proxy https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.34.0/crictl-v1.34.0-linux-amd64.tar.gz https://github.com/opencontainers/runc/releases/download/v1.4.0/runc.amd64 https://github.com/containernetworking/plugins/releases/download/v1.8.0/cni-plugins-linux-amd64-v1.8.0.tgz https://github.com/containerd/containerd/releases/download/v2.1.5/containerd-2.1.5-linux-amd64.tar.gz https://github.com/etcd-io/etcd/releases/download/v3.6.7/etcd-v3.6.7-linux-amd64.tar.gz 
+EOF
+```
+
+
+최신버전으로 변경하였다면 wget으로 다운로드한다. 
+
+```sh
 wget -q --show-progress \
   --https-only \
   --timestamping \
   -P downloads \
-  -i downloads-amd64-latest.txt
+  -i downloads-amd64.txt
 ```
 
+![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T122029768Z.png)
 
-![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T051455703Z.png)
+각종 컴포넌트 분류를 위한 폴더를 만들고 압축을 풀어준다.
 
 ```bash
 mkdir -p downloads/{client,cni-plugins,controller,worker}
@@ -261,20 +315,22 @@ tar -xvf downloads/containerd-2.1.5-linux-amd64.tar.gz --strip-components 1 -C d
 
 tar -xvf downloads/cni-plugins-linux-amd64-v1.8.0.tgz -C downloads/cni-plugins/ && tree -ug downloads
 
-tar -xvf downloads/etcd-v3.5.26-linux-amd64.tar.gz -C downloads/ --strip-components 1 etcd-v3.5.26-linux-amd64/etcdctl etcd-v3.5.26-linux-amd64/etcd && tree -ug downloads
+tar -xvf downloads/etcd-v3.6.7-linux-amd64.tar.gz \
+-C downloads/ \
+--strip-components 1 \
+etcd-v3.6.7-linux-amd64/etcdctl \
+etcd-v3.6.7-linux-amd64/etcd && tree -ug downloads
 
 # 확인
 tree downloads/worker/ 
 tree downloads/cni-plugins
 ls -l downloads/{etcd,etcdctl}
 
-
-
 # 파일 이동 
 mv downloads/{etcdctl,kubectl} downloads/client/ 
 mv downloads/{etcd,kube-apiserver,kube-controller-manager,kube-scheduler} downloads/controller/ 
 mv downloads/{kubelet,kube-proxy} downloads/worker/ 
-mv downloads/runc.${ARCH} downloads/worker/runc
+mv downloads/runc.amd64 downloads/worker/runc
 
 # 확인 
 tree downloads/client/ 
@@ -303,11 +359,18 @@ cp downloads/client/kubectl /usr/local/bin/
 ```
 
 
+![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T122637566Z.png)
+
+kubectl 버전 확인
+```sh
+kubectl version --client
+```
+
 ![[2026-01-04-Bootstrap k8s the hard way-18.png]]
 
 
 
-## SSH 접속 환경 설정
+# SSH 접속 환경 설정
 
 ```bash
 # Machine Database (서버 속성 저장 파일) : IPV4_ADDRESS FQDN HOSTNAME POD_SUBNET
