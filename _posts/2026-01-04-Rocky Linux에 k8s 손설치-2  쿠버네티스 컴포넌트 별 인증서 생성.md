@@ -393,12 +393,8 @@ ssh node-0 ls -l /var/lib/kubelet
 ssh node-1 ls -l /var/lib/kubelet
 
 # 서버머신에 적절한 개인키 및 증명서를 전달
-scp \ 
-  ca.key ca.crt \
-  kube-api-server.key kube-api-server.crt \
-  service-accounts.key service-accounts.crt \
-  root@server:~  
-  
+scp ca.key ca.crt kube-api-server.key kube-api-server.crt service-accounts.key service-accounts.crt root@server:~
+
 # 확인
 ssh server ls -l /root
   

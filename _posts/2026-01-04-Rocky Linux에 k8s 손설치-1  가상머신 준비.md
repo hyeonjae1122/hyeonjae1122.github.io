@@ -286,7 +286,18 @@ k8s 구성을 위한 컴포넌트 다운로드한다. 위에서 다운로드한 
 [쿠버네티스 다운로드 공식 링크] (https://www.downloadkubernetes.com/)
 
 ```sh
-cat > downloads-amd64.txt << 'EOF' https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-scheduler https://dl.k8s.io/v1.34.2/bin/linux/amd64/kubectl https://dl.k8s.io/v1.34.2/bin/linux/amd64/kubelet https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-apiserver https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-controller-manager https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-proxy https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.34.0/crictl-v1.34.0-linux-amd64.tar.gz https://github.com/opencontainers/runc/releases/download/v1.4.0/runc.amd64 https://github.com/containernetworking/plugins/releases/download/v1.8.0/cni-plugins-linux-amd64-v1.8.0.tgz https://github.com/containerd/containerd/releases/download/v2.1.5/containerd-2.1.5-linux-amd64.tar.gz https://github.com/etcd-io/etcd/releases/download/v3.6.7/etcd-v3.6.7-linux-amd64.tar.gz 
+cat > downloads-amd64.txt << 'EOF'
+https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-scheduler
+https://dl.k8s.io/v1.34.2/bin/linux/amd64/kubectl
+https://dl.k8s.io/v1.34.2/bin/linux/amd64/kubelet
+https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-apiserver
+https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-controller-manager
+https://dl.k8s.io/v1.34.2/bin/linux/amd64/kube-proxy
+https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.34.0/crictl-v1.34.0-linux-amd64.tar.gz
+https://github.com/opencontainers/runc/releases/download/v1.4.0/runc.amd64
+https://github.com/containernetworking/plugins/releases/download/v1.8.0/cni-plugins-linux-amd64-v1.8.0.tgz
+https://github.com/containerd/containerd/releases/download/v2.1.5/containerd-2.1.5-linux-amd64.tar.gz
+https://github.com/etcd-io/etcd/releases/download/v3.6.7/etcd-v3.6.7-linux-amd64.tar.gz
 EOF
 ```
 

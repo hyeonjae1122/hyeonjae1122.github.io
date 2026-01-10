@@ -13,6 +13,9 @@
 
 ### kube-apiserver.service 기동
 
+
+
+
 ```bash
 # Prerequisites
 
@@ -285,8 +288,6 @@ ssh root@server # 이미 server 에 ssh 접속 상태
 # Create the system:kube-apiserver-to-kubelet ClusterRole with permissions to access the Kubelet API and perform most common tasks associated with managing pods:
 cat kube-apiserver-to-kubelet.yaml
 kubectl apply -f kube-apiserver-to-kubelet.yaml --kubeconfig admin.kubeconfig
-clusterrole.rbac.authorization.k8s.io/system:kube-apiserver-to-kubelet created
-clusterrolebinding.rbac.authorization.k8s.io/system:kube-apiserver created
 
 # 확인
 kubectl get clusterroles system:kube-apiserver-to-kubelet --kubeconfig admin.kubeconfig
@@ -294,7 +295,24 @@ kubectl get clusterrolebindings system:kube-apiserver --kubeconfig admin.kubecon
 
 ---------------------------------------------------------------
 ```
+
+
+### jumpbox 서버에서 k8s controlplane 정상동작 확인
+
+- `vagrant ssh jumpbox`
+
+접속이 불가할 경우 방화벽 중지 후 curl 테스트. 
+
+```bash
+# 방화벽 중단
+sudo systemctl stop firewalld
+
+curl -s -k --cacert ca.crt https://server.kubernetes.local:6443/version | jq
+```
+
+![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T163806078Z.png)
 # node-0
+
 ```bash
 ssh root@node-0
 # EPEL 저장소 활성화 bridge-utils 설치를 위해
