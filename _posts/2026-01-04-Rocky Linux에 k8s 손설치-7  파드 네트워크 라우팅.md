@@ -2,6 +2,8 @@
 
 # node-0/1에 PodCIDR과 통신을 위한 OS 커널에 (수동) 라우팅 설정
 
+쿠버네티스에서 Pod은 각 노드 내에서만 IP를 갖는다. 다른 노드의 Pod과 통신하려면 OS 커널 수준에서 라우팅 테이블을 설정해야 한다. 보통 네트워크 플러그인(CNI)이 이를 자동으로 해주지만, 여기서는 수동으로 설정한다.
+
 |항목|네트워크 대역 or IP|
 |---|---|
 |clusterCIDR|10.200.0.0/16|
@@ -11,7 +13,6 @@
 |→ api clusterIP|10.32.0.1|
 
 - `vagrant ssh jumpbox`
-
 
 ```bash
 SERVER_IP=$(grep server machines.txt | cut -d " " -f 1)

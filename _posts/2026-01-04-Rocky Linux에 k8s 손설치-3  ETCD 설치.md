@@ -1,16 +1,19 @@
 # 데이터 암호화 config 및 key생성
 
-```bash
-# The Encryption Key
+Kubernetes에서 Secret 리소스(민감 데이터)를 ETCD에 저장할 때 암호화하는 과정이다.
 
-# Generate an encryption key
+- key의 용도
+	- ETCD에 저장되는 모든 Secret(비밀번호, API 토큰 등)을 암호화
+	- ETCD의 데이터를 누군가 탈취해도 암호화되어 있어서 안전
+
+```bash
 export ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64)
 echo $ENCRYPTION_KEY
 JMnUP1PUUORZE9iadPdzYifnvPVIniSzOW6NUoMofVc=
+```
 
 
-# The Encryption Config File
-
+```bash
 # Create the encryption-config.yaml encryption config file
 # (참고) 실제 etcd 값에 기록되는 헤더 : k8s:enc:aescbc:v1:key1:<ciphertext>
 cat configs/encryption-config.yaml
@@ -39,9 +42,9 @@ ssh server ls -l /root/encryption-config.yaml
 
 
 
-# Server 노드에 etcd 서비스 기동
+# Server 노드(컨트롤플레인) 에 ETCD 설치
 
-
+ETCD Systemd 서비스 파일 생성
 ```bash
 cat units/etcd.service | grep controller
 
@@ -55,20 +58,21 @@ Documentation=https://github.com/etcd-io/etcd
 Type=notify
 ExecStart=/usr/local/bin/etcd \\
   --name ${ETCD_NAME} \\
-  --initial-advertise-peer-urls http://127.0.0.1:2380 \\
-  --listen-peer-urls http://127.0.0.1:2380 \\
-  --listen-client-urls http://127.0.0.1:2379 \\
-  --advertise-client-urls http://127.0.0.1:2379 \\
-  --initial-cluster-token etcd-cluster-0 \\
-  --initial-cluster ${ETCD_NAME}=http://127.0.0.1:2380 \\
+  --initial-advertise-peer-urls http://127.0.0.1:2380 \\ # 다른 ETCD에 알릴 주소
+  --listen-peer-urls http://127.0.0.1:2380 \\ # 다른 ETCD 통신용 포트
+  --listen-client-urls http://127.0.0.1:2379 \\ # 클라이언트 통신 포트 (Kubernetes API)
+  --advertise-client-urls http://127.0.0.1:2379 \\ # 클라이언트에 알릴 주소
+  --initial-cluster-token etcd-cluster-0 \\ # 클러스터 생성 시 사용하는 토큰
+  --initial-cluster ${ETCD_NAME}=http://127.0.0.1:2380 \\ # 클러스터 멤버 정보
   --initial-cluster-state new \\
   --data-dir=/var/lib/etcd
 Restart=on-failure
 RestartSec=5
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=multi-user.target # 시스템 부팅 시 자동 시작
 EOF
+
 cat units/etcd.service | grep server
 
 
@@ -78,6 +82,20 @@ scp \
   units/etcd.service \
   root@server:~/
 ```
+
+-  포트 설명
+
+|포트|용도|사용자|
+|---|---|---|
+|**2379**|클라이언트 통신|Kubernetes API 서버|
+|**2380**|피어(Peer) 통신|다른 ETCD 서버 (단일 노드이므로 사용 안 함)|
+
+- 디렉토리 용도
+
+| 디렉토리             | 용도                   |
+| ---------------- | -------------------- |
+| `/etc/etcd/`     | ETCD 설정 및 TLS 인증서 저장 |
+| `/var/lib/etcd/` | ETCD 데이터베이스 파일 저장    |
 
 
 ```bash
