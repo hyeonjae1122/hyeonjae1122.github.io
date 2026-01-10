@@ -1,8 +1,15 @@
 
 집에 남아도는 `x86_64` 아키텍처의 리눅스 서버로 Rocky Linux 환경으로 실습을 진행 하였습니다. 
+
+`최종 구성도`
+
+![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T111321715Z.png)
+
+
+
 # Prerequisites
 
-- VirtualBox 설치
+- 가상머신 프로비저닝을 위한 VirtualBox 설치
 
 ```bash
 # 저장소 추가
@@ -20,7 +27,7 @@ sudo apt-get install -y virtualbox-ext-pack
 sudo usermod -aG vboxusers $USER
 ```
 
-- Vagrant 설치
+- 가상머신 프로비저닝을 위한 Vagrant 설치
 
 ```bash
 wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
@@ -30,7 +37,7 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashi
 sudo apt update && sudo apt install vagrant
 ```
 
-> 트러블 슈팅
+> 설치시 트러블 슈팅
 
 ```bash
 # IP추가
@@ -61,9 +68,21 @@ sudo reboot
 
 # Vagrant로 가상 머신 프로비저닝 하기
 
-#### Rocky Linux용 init_cfg.sh
+#### Rocky Linux용 자동화 스크립트 다운로드(init_cfg.sh)
+
+- TASK 1 : vagrant 사용자가 로그인할 때 자동으로 root 권한으로 전환되게 설정하고, vi 명령어를 vim으로 자동 변환하며, 서버의 시간대를 서울(Asia/Seoul)로 설정
+- TASK 2: Rocky Linux는 보안 강화 모듈인 SELinux를 사용
+- TASK 3: 메모리 가상 확장 기능인 SWAP을 끈다.
+- TASK 4: 필요한 유틸리티들을 설치
+- TASK 5: 관리자 계정의 비밀번호를 'qwe123'으로 설정
+- TASK 6: 원격 접속을 위해 암호 인증과 root 로그인을 허용하도록 설정한 후 SSH 서비스를 재시작한다.
+- TASK 7:  hosts 파일에 IP와 호스트명을 매핑하여, DNS 서버 없이도 각 서버에 접근할 수 있게 설정
 
 [init_cfg.sh 다운로드 Link](https://raw.githubusercontent.com/hyeonjae1122/Vagrant-for-Rocky-Linux/refs/heads/main/init_cfg.sh)
+
+```bash
+wget https://raw.githubusercontent.com/hyeonjae1122/Vagrant-for-Rocky-Linux/refs/heads/main/init_cfg.sh
+```
 
 
 ```bash
@@ -117,9 +136,13 @@ echo ">>>> Initial Config End <<<<"
 
 #### Rockylinux 이미지와 버전정보
 
-[Vagrantfile 다운로드 Link](https://raw.githubusercontent.com/hyeonjae1122/Vagrant-for-Rocky-Linux/6e1e2864c76485eeb20b34f93dcdcfdbec5f1d9e/Vagrant)
+[Vagrantfile 다운로드 Link](https://raw.githubusercontent.com/hyeonjae1122/Vagrant-for-Rocky-Linux/refs/heads/main/vagrantfile) 
 
-[Box Link](https://portal.cloud.hashicorp.com/vagrant/discover/bento/rockylinux-9)
+```bash
+wget https://raw.githubusercontent.com/hyeonjae1122/Vagrant-for-Rocky-Linux/refs/heads/main/vagrantfile
+```
+
+[Box Link](https://portal.cloud.hashicorp.com/vagrant/discover/bento/rockylinux-9) bento/rockylinux-9 이미지 경로
 
 ```bash
 BOX_IMAGE = "bento/rockylinux-9"
@@ -127,7 +150,35 @@ BOX_VERSION = "202510.26.0"
 ```
 
 
-![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T043413999Z.png)
+#### Vagrant 를 이용한 가상 머신 배포
+
+총 4대의 가상머신을 배포한다. 
+
+| NAME    | Description         | CPU | RAM     | NIC1      | NIC2               | HOSTNAME                           |
+| ------- | ------------------- | --- | ------- | --------- | ------------------ | ---------------------------------- |
+| jumpbox | Administration host | 2   | 1536 MB | 10.0.2.15 | **192.168.10.10**  | **jumpbox**                        |
+| server  | Kubernetes server   | 2   | 2GB     | 10.0.2.15 | **192.168.10.100** | server.kubernetes.local **server** |
+| node-0  | Kubernetes worker   | 2   | 2GB     | 10.0.2.15 | **192.168.10.101** | node-0.kubernetes.local **node-0** |
+| node-1  | Kubernetes worker   | 2   | 2GB     | 10.0.2.15 | **192.168.10.102** | node-1.kubernetes.local **node-1** |
+
+배포 명령어 실행
+
+```bash
+# 배포
+vagrant up
+
+# 실습용 OS 이미지 자동 다운로드 확인
+vagrant box list
+
+# 배포된 가상머신 확인
+vagrant status
+```
+
+아래와 같이 예상대로 4대의 가상머신이 배포된 것을 확인할 수 있다.
+
+![|600x150](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T043413999Z.png)
+
+
 
 
 
