@@ -22,9 +22,9 @@ sudo usermod -aG vboxusers $USER
 ```bash
 sudo bash -c 'echo "* 192.168.10.0/24" >> /etc/vbox/networks.conf'
 ```
-```
-	- VirtualBox와 KVM 충돌
-- 
+	
+-  VirtualBox와 KVM 충돌
+
 
 2. 리눅스에 Vagrant 설치하기
 ```bash
@@ -32,6 +32,9 @@ wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/sh
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
 sudo apt update && sudo apt install vagrant
 ```
+
+
+![[2026-01-04-Bootstrap k8s the hard way-1.png]]
 
 3.  kubelet설치하기
 
