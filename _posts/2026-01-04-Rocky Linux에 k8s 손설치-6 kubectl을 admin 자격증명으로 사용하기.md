@@ -2,30 +2,48 @@
 
 # jumpbox 노드에서 kubectl 을 admin 자격증명으로 사용을 위한 설정하기
 
-- `vagrant ssh jumpbox`
+- `vagrant ssh jumpbox` 접속
 
+- 클러스터 접근 가능 확인 (CA 인증서로 API 서버에 접근해서 정상 작동 확인)
 ```bash
 curl -s -k --cacert ca.crt https://server.kubernetes.local:6443/version | jq
+```
 
 
+## kubectl 설정 파일(~/.kube/config) 생성
+
+- 클러스터 정보 등록
+```bash
 kubectl config set-cluster kubernetes-the-hard-way \
   --certificate-authority=ca.crt \
   --embed-certs=true \
   --server=https://server.kubernetes.local:6443
+```
 
+- 사용자(admin) 인증 정보 등록
+
+```bash
 kubectl config set-credentials admin \
   --client-certificate=admin.crt \
   --client-key=admin.key
+```
 
+- Context(클러스터 + 사용자 조합) 생성
+
+```bash
 kubectl config set-context kubernetes-the-hard-way \
   --cluster=kubernetes-the-hard-way \
   --user=admin
+```
 
+- 기본 Context 설정 (`kubectl` 명령어 실행 시 자동으로 이 context 사용)
+
+```bash
 kubectl config use-context kubernetes-the-hard-way
+```
 
-# 위 명령어를 실행한 결과 kubectl 명령줄 도구에서 사용하는 기본 위치 ~/.kube/config에 kubectl 파일이 생성됩니다. 
-# 이는 또한 구성을 지정하지 않고도 kubectl 명령어를 실행할 수 있음을 의미합니다.
 
+```bash
 kubectl version
 kubectl get nodes -v=6
 ```
@@ -33,7 +51,7 @@ kubectl get nodes -v=6
 ![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T171026667Z.png)
 
 
-
+- 설정 확인
 ```bash
 cat /root/.kube/config
 kubectl get nodes -owide
