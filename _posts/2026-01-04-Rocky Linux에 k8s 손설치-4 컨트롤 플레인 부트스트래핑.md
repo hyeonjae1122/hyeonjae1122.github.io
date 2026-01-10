@@ -309,57 +309,11 @@ kubectl get clusterrolebindings system:kube-apiserver --kubeconfig admin.kubecon
 접속이 불가할 경우 방화벽 중지 후 curl 테스트. 
 
 ```bash
-# 방화벽 중단
+# 방화벽 중단 및 비활성화
 sudo systemctl stop firewalld
+sudo systemctl disable firewalld
 
 curl -s -k --cacert ca.crt https://server.kubernetes.local:6443/version | jq
 ```
 
 ![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260110T163806078Z.png)
-# node-0
-
-```bash
-ssh root@node-0
-# EPEL 저장소 활성화 bridge-utils 설치를 위해
-sudo dnf -y install epel-release 
-
-# 
-dnf -y install socat conntrack ipset kmod psmisc bridge-utils
-
-# Disable Swap : Verify if swap is disabled:
-swapon --show
-
-#
-mkdir -p \
- /etc/cni/net.d \ 
- /opt/cni/bin \
- /var/lib/kubelet \ 
- /var/lib/kube-proxy \
- /var/lib/kubernetes \
- /var/run/kubernetes
-```
-
-
-갑자기 되었는데?
-```bash
-# node-1에서
-sudo systemctl status firewalld
-getenforce
-
-# 만약 활성화되어 있으면
-sudo systemctl stop firewalld
-sudo systemctl disable firewalld
-sudo setenforce 0
-
-
-# 재시작
-
-sudo systemctl restart containerd
-sudo systemctl restart kubelet
-sudo systemctl restart kube-proxy
-
-sleep 5
-
-# 상태 확인
-sudo systemctl status kubelet --no-pager | tail -10
-```
