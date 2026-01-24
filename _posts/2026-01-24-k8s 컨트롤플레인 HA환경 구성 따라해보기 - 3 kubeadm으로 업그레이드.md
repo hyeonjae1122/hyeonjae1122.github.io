@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "[K8S Deploy Study by Gasida] -  k8s 컨트롤플레인 HA환경 구성 따라해보기 - kubeadm 으로 업그레이드"
+title: "[K8S Deploy Study by Gasida] -  k8s 컨트롤플레인 HA환경 구성 따라해보기 - 3 kubeadm으로 업그레이드"
 categories:
   - kubernetes
 tags:
@@ -695,6 +695,7 @@ crictl ps
 ![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260124T170448767Z.png)
 
 정상동작 확인
+
 ```
 kubectl get node -owide
 ```
