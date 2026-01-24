@@ -447,7 +447,7 @@ kubectl describe node k8s-ctr1 | grep 'Kubelet Version:'
 
 
 - `k8s-ctr3`에서 addon 업그레이드 확인
-- 
+
 ![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260124T164247933Z.png)
 
 - 모든 컨트롤 플레인 노드에 버전 업그레이드 확인
