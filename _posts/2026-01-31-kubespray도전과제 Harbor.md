@@ -195,7 +195,7 @@ cat roles/container-engine/containerd/tasks/main.yml
 
 - `ctr oci spec`: Containerd의 CLI 도구인 `ctr`을 사용해 기본 OCI(Open Container Initiative) 런타임 스펙을 생성하고 이를 변수(`set_fact`)로 저장한다. 이는 컨테이너가 실행될 때의 표준 규격을 정의하는 작업이다.
 
-```
+```yaml
 - name: Containerd | Generate default base_runtime_spec
   register: ctr_oci_spec
   command: "{{ containerd_bin_dir }}/ctr oci spec"
@@ -256,7 +256,6 @@ cat roles/container-engine/containerd/tasks/main.yml
         dest: "{{ containerd_cfg_dir }}/certs.d/{{ item.prefix }}/hosts.toml"
         mode: "0640"
       loop: "{{ containerd_registries_mirrors }}"
-
 ```
 
 
