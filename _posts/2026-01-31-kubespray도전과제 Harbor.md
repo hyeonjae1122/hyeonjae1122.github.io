@@ -205,15 +205,6 @@ cat roles/container-engine/containerd/tasks/main.yml
 - name: Containerd | Store generated default base_runtime_spec
   set_fact:
     containerd_default_base_runtime_spec: "{{ ctr_oci_spec.stdout | from_json }}"
-
-- name: Containerd | Write base_runtime_specs
-  copy:
-    content: "{{ item.value }}"
-    dest: "{{ containerd_cfg_dir }}/{{ item.key }}"
-    owner: "root"
-    mode: "0644"
-  with_dict: "{{ containerd_base_runtime_specs | default({}) }}"
-  notify: Restart containerd
 ```
 
 
