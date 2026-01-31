@@ -126,7 +126,8 @@ cat roles/container-engine/containerd/tasks/main.yml
 
 - containerd 다운로드
 
-```yaml
+
+```bash
 ---
 - name: Containerd | Download containerd
   include_tasks: "../../../download/tasks/download_file.yml"
@@ -134,7 +135,9 @@ cat roles/container-engine/containerd/tasks/main.yml
     download: "{{ download_defaults | combine(downloads.containerd) }}"
 ```
 
+
 - `unarchive`를 통해 공식 경로(`containerd_bin_dir`)에 압축을 푼다. `--strip-components=1` 옵션은 압축 파일 내의 불필요한 상위 폴더 구조를 제거하고 실제 실행 파일만 깔끔하게 추출하기 위함이다.
+
 
 ```yaml
 - name: Containerd | Unpack containerd archive
@@ -279,6 +282,7 @@ vagrant up
 ```
 
 - `Vagrantfile`
+
 ```bash
 # Base Image
 BOX_IMAGE = "bento/rockylinux-9"
