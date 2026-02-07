@@ -1,5 +1,13 @@
 ---
 layout: post
+tags:
+  - Ansible
+  - kubespray
+  - kubernetes
+  - k8s
+title:
+categories:
+  - kubernetes
 ---
 
 # 사전작업 Flannel CNI Plugin 업그레이드

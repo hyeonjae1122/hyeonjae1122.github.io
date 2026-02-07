@@ -1,9 +1,13 @@
 ---
 tags:
   - Ansible
+  - k8s
+  - kubespray
+  - kubernetes
 layout: post
 title: 2026-02-07-Kubespary HA & Upgrade - 0 실습 환경 배포하기
 categories:
+  - kubernetes
 ---
 
 
