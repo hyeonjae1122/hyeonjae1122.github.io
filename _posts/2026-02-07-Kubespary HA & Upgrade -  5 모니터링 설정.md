@@ -1,147 +1,245 @@
+---
+layout: post
+---
 
 >목표
->모니터링을 위해 ETCD 메트릭을 수집하도록 설정을 실
+>모니터링을 위해 ETCD 메트릭을 수집하도록 설정
 
+# NFS subdir external provisioner 설치
 
-# ETCD 노드(k8s-node5) 추가
-
-- `inventory.ini`를 수정하자. 
-    - `etcd`노드만을 추가하기 위해서 아래와 같이 변경한다 .
-- `k8s-node4`(삭제완료), 5는 워커노드로도 사용되지 않았던 노드이다.
-- 만약에 워커노드나 컨트롤 플레인으로 사용되었던 노드라면 먼저 해당 노드를 제거해야한다.(`remove-node.yml`)
+-  NFS subdir external provisioner 설치 : admin-lb 에 NFS Server(/srv/nfs/share) 설정 되어 있음
 
 ```bash
-cat << EOF > /root/kubespray/inventory/mycluster/inventory.ini
-[kube_control_plane]
-k8s-node1 ansible_host=192.168.10.11 ip=192.168.10.11 etcd_member_name=etcd1
-k8s-node2 ansible_host=192.168.10.12 ip=192.168.10.12 etcd_member_name=etcd2
-k8s-node3 ansible_host=192.168.10.13 ip=192.168.10.13 etcd_member_name=etcd3
-
-[etcd]
-k8s-node1 ansible_host=192.168.10.11 ip=192.168.10.11 etcd_member_name=etcd1
-k8s-node2 ansible_host=192.168.10.12 ip=192.168.10.12 etcd_member_name=etcd2
-k8s-node3 ansible_host=192.168.10.13 ip=192.168.10.13 etcd_member_name=etcd3
-k8s-node4 ansible_host=192.168.10.14 ip=192.168.10.14 etcd_member_name=etcd4
-k8s-node5 ansible_host=192.168.10.15 ip=192.168.10.15 etcd_member_name=etcd5
-
-EOF
+kubectl create ns nfs-provisioner
+helm repo add nfs-subdir-external-provisioner https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
+helm install nfs-provisioner nfs-subdir-external-provisioner/nfs-subdir-external-provisioner -n nfs-provisioner \
+    --set nfs.server=192.168.10.10 \
+    --set nfs.path=/srv/nfs/share \
+    --set storageClass.defaultClass=true
 ```
 
 
-- `cluster.yml` 실행
-    -  실행하는 시점에서 `etcd` 노드는 짝수가 될 것이나 모든 기능은 정상적으로 작동해야하며 노드를 제거하기 전에 클러스터가 새로운 `etcd` 리더를 선출하려고 할때만 문제가 발생할 수 있다. (하지만 실행중 애플리케이션은 계속해서 사용가능)
-    - 한번에 여러 ETCD 노드를 추가하는 경우에는 리트라이 횟수를 늘리는 옵션을 적용하자. 
-        - `-e etcd_retries=10`
+스토리지 클래스 확인
 
 ```bash
-ansible-playbook -i inventory/mycluster/inventory.ini cluster.yml \
-  --limit=etcd,kube_control_plane -e ignore_assert_errors=yes -e etcd_retries=10
+kubectl get sc
+
+# 파드 확인
+kubectl get pod -n nfs-provisioner -owide
 ```
 
 
-- 모든 컨트롤 플레인에서 `kube-apiserver.yaml`을 편집한다. 
-    - `etcd-servers=...`
+
+# kube-prometheus-stack 설치, 대시보드 추가
+
+- helm 추가
 
 ```bash
-vi /etc/kubernetes/manifests/kube-apiserver.yaml
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 ```
 
 ```bash
-..
-- --etcd-servers=https://192.168.10.11:2379,https://192.168.10.12:2379,https://192.168.10.13:2379, https://192.168.10.14:2379, https://192.168.10.15:2379
-  ..
+# 파라미터 파일 생성
+cat <<EOT > monitor-values.yaml
+prometheus:
+  prometheusSpec:
+    scrapeInterval: "20s"
+    evaluationInterval: "20s"
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+    additionalScrapeConfigs:
+      - job_name: 'haproxy-metrics'
+        static_configs:
+          - targets:
+              - '192.168.10.10:8405'
+    externalLabels:
+      cluster: "myk8s-cluster"
+  service:
+    type: NodePort
+    nodePort: 30001
+
+grafana:
+  defaultDashboardsTimezone: Asia/Seoul
+  adminPassword: prom-operator
+  service:
+    type: NodePort
+    nodePort: 30002
+
+alertmanager:
+  enabled: false
+defaultRules:
+  create: false
+kubeProxy:
+  enabled: false
+prometheus-windows-exporter:
+  prometheus:
+    monitor:
+      enabled: false
+EOT
+```
+
+-  배포
+
+```bash
+helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack --version 80.13.3 \
+-f monitor-values.yaml --create-namespace --namespace monitoring
 ```
 
 - 확인
 
+```bash
+helm list -n monitoring
+kubectl get pod,svc,ingress,pvc -n monitoring
+kubectl get prometheus,servicemonitors,alertmanagers -n monitoring
+kubectl get crd | grep monitoring
 ```
-ssh k8s-node1 cat /etc/kubernetes/manifests/kube-apiserver.yaml | grep etcd-servers
 
-ssh k8s-node2 cat /etc/kubernetes/manifests/kube-apiserver.yaml | grep etcd-servers
-
-ssh k8s-node3 cat /etc/kubernetes/manifests/kube-apiserver.yaml | grep etcd-servers
-```
-
-
-![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260207T092337248Z.png)
-
-
-- 확인 
+-  각각 웹 접속 실행 : NodePort 접속
 
 ```bash
-for i in {1..5}; do echo ">> k8s-node$i <<"; ssh k8s-node$i etcdctl.sh endpoint status -w table; echo; done
-```
+open http://192.168.10.14:30001 # prometheus
+open http://192.168.10.14:30002 # grafana : 접속 계정 admin / prom-operator
 
-![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260207T092557374Z.png)
+# 프로메테우스 버전 확인
+kubectl exec -it sts/prometheus-kube-prometheus-stack-prometheus -n monitoring -c prometheus -- prometheus --version
 
-# ETCD 노드 삭제
+# 그라파나 버전 확인
+kubectl exec -it -n monitoring deploy/kube-prometheus-stack-grafana -- grafana --version
 
-ETCD 5대에서 다시 3대로 줄여보자 (홀수 유지)
-- 노드가 꺼져있을 때에는 아래 옵션 추가
-    - `-e node=k8s-node5 `
-    - `-e reset_nodes=false`
-    - `-e allow_ungraceful_removal=true`
-
-
-- etcd 멤버에서 제거
-
->왜 인벤토리에 남겨둔 채로 실행하나? → Kubespray가 해당 노드에 접속해서 etcd 서비스 중지, 데이터 정리, 인증서 삭제 등 클린업을 수행해야 하기 때문
-
- 
-```bash
-#k8s-node5 제거
-ansible-playbook -i inventory/mycluster/inventory.ini remove-node.yml -e node=k8s-node5
-```
-
-```bash
-#k8s-node4 제거
-ansible-playbook -i inventory/mycluster/inventory.ini remove-node.yml -e node=k8s-node4
 ```
 
 
-- 인벤토리 수정
+- Grafana Dashboard
+    - `15661`, `12693` 
+        - [https://github.com/dotdc/grafana-dashboards-kubernetes](https://github.com/dotdc/grafana-dashboards-kubernetes)
 
 ```bash
-cat << EOF > /root/kubespray/inventory/mycluster/inventory.ini
-[kube_control_plane]
-k8s-node1 ansible_host=192.168.10.11 ip=192.168.10.11 etcd_member_name=etcd1
-k8s-node2 ansible_host=192.168.10.12 ip=192.168.10.12 etcd_member_name=etcd2
-k8s-node3 ansible_host=192.168.10.13 ip=192.168.10.13 etcd_member_name=etcd3
+curl -o 12693_rev12.json https://grafana.com/api/dashboards/12693/revisions/12/download
+curl -o 15661_rev2.json https://grafana.com/api/dashboards/15661/revisions/2/download
+curl -o k8s-system-api-server.json https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/refs/heads/master/dashboards/k8s-system-api-server.json
 
-[etcd]
-k8s-node1 ansible_host=192.168.10.11 ip=192.168.10.11 etcd_member_name=etcd1
-k8s-node2 ansible_host=192.168.10.12 ip=192.168.10.12 etcd_member_name=etcd2
-k8s-node3 ansible_host=192.168.10.13 ip=192.168.10.13 etcd_member_name=etcd3
+# sed 명령어로 uid 일괄 변경 : 기본 데이터소스의 uid 'prometheus' 사용
+sed -i -e 's/${DS_PROMETHEUS}/prometheus/g' 12693_rev12.json
+sed -i -e 's/${DS__VICTORIAMETRICS-PROD-ALL}/prometheus/g' 15661_rev2.json
+sed -i -e 's/${DS_PROMETHEUS}/prometheus/g' k8s-system-api-server.json
+
+# my-dashboard 컨피그맵 생성 : Grafana 포드 내의 사이드카 컨테이너가 grafana_dashboard="1" 라벨 탐지!
+kubectl create configmap my-dashboard --from-file=12693_rev12.json --from-file=15661_rev2.json --from-file=k8s-system-api-server.json -n monitoring
+kubectl label configmap my-dashboard grafana_dashboard="1" -n monitoring
+
+# 대시보드 경로에 추가 확인
+kubectl exec -it -n monitoring deploy/kube-prometheus-stack-grafana -- ls -l /tmp/dashboards
+```
+
+
+# ETCD 메트릭 수집 될 수 있게 설정
+
+```bash
+ssh k8s-node1 ss -tnlp | grep etcd
+ssh k8s-node1 ps -ef | grep etcd
+cat roles/etcd/templates/etcd.env.j2 | grep -i metric
+```
+
+
+```
+cat << EOF >> inventory/mycluster/group_vars/k8s_cluster/k8s-cluster.yml
+etcd_metrics: true
+etcd_listen_metrics_urls: "http://0.0.0.0:2381"
 EOF
 ```
 
 
-- 나머지 노드 설정 재생성
-
-```bash
-ansible-playbook -i inventory/mycluster/inventory.ini cluster.yml \
-  --limit=etcd,kube_control_plane -e ignore_assert_errors=yes -e etcd_retries=10
+```
+tail -n 5 inventory/mycluster/group_vars/k8s_cluster/k8s-cluster.yml
 ```
 
-
-- 컨트롤 플레인에서 etcd 주소 변경
-
-```bash
-vi /etc/kubernetes/manifests/kube-apiserver.yaml
-```
-
+- 모니터링
+    - `k8s-node1`
 
 ```bash
-- --etcd-servers=https://192.168.10.11:2379,https://192.168.10.12:2379,https://192.168.10.13:2379
+watch -d "etcdctl.sh member list -w table"
 ```
+
+- `admin-lb`
+
+```bash
+while true; do echo ">> k8s-node1 <<"; ssh k8s-node1 etcdctl.sh endpoint status -w table; echo; echo ">> k8s-node2 <<"; ssh k8s-node2 etcdctl.sh endpoint status -w table; echo ">> k8s-node3 <<"; ssh k8s-node3 etcdctl.sh endpoint status -w table; sleep 1; done
+```
+
+- etcd 재시작
+
+```bash
+ansible-playbook -i inventory/mycluster/inventory.ini -v cluster.yml --tags "etcd" --list-tasks
+ansible-playbook -i inventory/mycluster/inventory.ini -v cluster.yml --tags "etcd" --limit etcd -e kube_version="1.32.9"
+```
+
 
 - 확인
 
-```
-for i in {1..5}; do echo ">> k8s-node$i <<"; ssh k8s-node$i etcdctl.sh endpoint status -w table; echo; done
+```bash
+ssh k8s-node1 etcdctl.sh member list -w table
+for i in {1..3}; do echo ">> k8s-node$i <<"; ssh k8s-node$i etcdctl.sh endpoint status -w table; echo; done
+
 ```
 
-![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260207T093933037Z.png)
 
->*중요*
-인벤토리에서 먼저 삭제하면 `remove-node.yml`이 해당 노드에 접근할  수 없어 클린업이 안 된다. 반드시 제거 실행 후 인벤토리 삭제 순서를 지키자.
+- 백업 확인
+
+```bash
+for i in {1..3}; do echo ">> k8s-node$i <<"; ssh k8s-node$i tree /var/backups; echo; done
+```
+
+
+```
+ssh k8s-node1 ss -tnlp | grep etcd
+
+curl -s http://192.168.10.11:2381/metrics
+curl -s http://192.168.10.12:2381/metrics
+curl -s http://192.168.10.13:2381/metrics
+```
+
+
+- 스크래핑 설정 추가
+
+```bash
+cat <<EOF > monitor-add-values.yaml
+prometheus:
+  prometheusSpec:
+    additionalScrapeConfigs:
+      - job_name: 'etcd'
+        metrics_path: /metrics 
+        static_configs:
+          - targets:
+              - '192.168.10.11:2381'
+              - '192.168.10.12:2381'
+              - '192.168.10.13:2381'
+EOF
+```
+
+
+- 헬름 업그레이드로 적용
+
+```bash
+helm get values -n monitoring kube-prometheus-stack
+helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack --version 80.13.3 \
+--reuse-values -f monitor-add-values.yaml --namespace monitoring
+```
+
+
+- 확인
+
+```bash
+helm get values -n monitoring kube-prometheus-stack
+```
+
+-  (옵션) 불필요 servicemonitor etcd 제거 : 반영에 다소 시간 소요
+
+```bash
+kubectl get servicemonitors.monitoring.coreos.com -n monitoring kube-prometheus-stack-kube-etcd -o yaml
+kubectl delete servicemonitors.monitoring.coreos.com -n monitoring kube-prometheus-stack-kube-etcd
+```

@@ -1,6 +1,12 @@
-
->목표
->첫 번째 컨트롤 플레인 노드를 교체한다.
+---
+post:
+tags:
+  - Ansible
+  - k8s
+  - kubernetes
+  - kubespray
+title: "[K8S Deploy Study by Gasida] -  Kubespary HA & Upgrade - 3 첫 번째 컨트롤 플레인 노드 추가 및 제거"
+---
 
 
 # 첫번째 컨트롤 플레인 및 etcd-master 추가 및 제거
