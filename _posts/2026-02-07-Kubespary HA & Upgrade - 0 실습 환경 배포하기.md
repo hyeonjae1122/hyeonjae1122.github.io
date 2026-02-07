@@ -4,7 +4,7 @@
 
 - Vagrantfile
 
-```vagrant
+```
 # Base Image  https://portal.cloud.hashicorp.com/vagrant/discover/bento/rockylinux-10.0
 BOX_IMAGE = "bento/rockylinux-10.0" # "bento/rockylinux-9"
 BOX_VERSION = "202510.26.0"
