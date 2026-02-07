@@ -21,12 +21,16 @@ ansible-playbook -i inventory/mycluster/inventory.ini -v remove-node.yml -e node
 ansible-playbook -i inventory/mycluster/inventory.ini -v remove-node.yml -e node=k8s-node3 -e skip_confirmation=true
 ```
 
-- 확인
+- 노드 확인
+
+```
+kubectl get node -owide
+```
+
+
+- 삭제 확인
 
 ```bash
-kubectl get node -owide
-
-# 삭제 확인
 ssh k8s-node5 tree /etc/kubernetes
 ssh k8s-node5 tree /var/lib/kubelet
 ssh k8s-node5 pstree -a
