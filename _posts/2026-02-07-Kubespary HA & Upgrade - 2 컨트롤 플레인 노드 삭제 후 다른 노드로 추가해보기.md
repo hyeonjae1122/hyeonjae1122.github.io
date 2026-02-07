@@ -1,3 +1,12 @@
+---
+layout: post
+tags:
+  - Ansible
+  - kubespray
+  - kubernetes
+  - k8s
+title: 2026-02-07-Kubespary HA & Upgrade - 2 컨트롤 플레인 노드 삭제 후 다른 노드로 추가해보기
+---
 
 >목표
 >1. k8s-node3, k8s-node5 삭제(초기화) 후 상태 확인
