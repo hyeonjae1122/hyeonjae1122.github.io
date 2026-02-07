@@ -1,5 +1,13 @@
 ---
 layout: post
+tags:
+  - Ansible
+  - kubespray
+  - kubernetes
+  - k8s
+title: 2026-02-07-Kubespary HA & Upgrade -  5 모니터링 설정
+categories:
+  - kubernetes
 ---
 
 >목표

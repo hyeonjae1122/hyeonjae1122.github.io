@@ -1,3 +1,10 @@
+---
+tags:
+  - Ansible
+layout: post
+title: 2026-02-07-Kubespary HA & Upgrade - 0 실습 환경 배포하기
+categories:
+---
 
 
 > 실습환경 배포를 위한 리소스를 리스트 업
