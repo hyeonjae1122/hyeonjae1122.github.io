@@ -8,7 +8,8 @@ tags:
 title: 2026-02-07-Kubespary HA & Upgrade - 1 노드 관리
 ---
 
-> kubespray를 활용하여 새로운 노드를 추가하고 삭제한다. 
+>목표
+kubespray를 활용하여 새로운 노드를 추가하고 삭제한다. 
  
 
 

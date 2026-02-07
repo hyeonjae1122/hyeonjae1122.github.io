@@ -7,7 +7,8 @@ tags:
   - kubespray
 title: "[K8S Deploy Study by Gasida] -  Kubespary HA & Upgrade - 3 첫 번째 컨트롤 플레인 노드 추가 및 제거"
 ---
-
+>목표
+>다수의 컨트롤 플레인에서 첫번째 컨트롤 플레인 및 etcd-master 추가 및 제거
 
 # 첫번째 컨트롤 플레인 및 etcd-master 추가 및 제거
 
