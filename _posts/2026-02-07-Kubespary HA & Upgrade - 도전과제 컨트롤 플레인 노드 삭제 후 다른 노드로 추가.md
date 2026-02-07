@@ -1,5 +1,8 @@
 
->k8s-node3/node5 삭제(초기화) 후 상태 확인 후 → k8s-node5를 컨트롤 플레인 노드로 추가 → k8s-node3을 워커 노드로 추가
+>목표
+>1. k8s-node3, k8s-node5 삭제(초기화) 후 상태 확인
+>2. k8s-node5를 컨트롤 플레인 노드로 추가
+>3. k8s-node3을 워커 노드로 추가
 
 
 #  컨트롤 플레인 노드(k8s-node3) / 워커노드(k8s-node5) 삭제
@@ -278,47 +281,5 @@ kubectl get node
 
 
 
-# k8s-node1 노드 삭제 
 
 
-- Kubespray는 첫 번째 컨트롤플레인/etcd 노드를 바로 제거할 수 없다. 내부적으로 첫 번째 노드를 기준점으로 사용하기 때문이다. 따라서 우회 절차가 필요하다.
-
-## 인벤토리 순서 변경
-
-
-```
-cat << EOF > /root/kubespray/inventory/mycluster/inventory.ini
-[kube_control_plane]
-k8s-node2 ansible_host=192.168.10.12 ip=192.168.10.12 etcd_member_name=etcd2
-k8s-node5 ansible_host=192.168.10.15 ip=192.168.10.15 etcd_member_name=etcd5
-k8s-node1 ansible_host=192.168.10.11 ip=192.168.10.11 etcd_member_name=etcd1
-
-[etcd:children]
-kube_control_plane
-
-[kube_node]
-k8s-node4 ansible_host=192.168.10.14 ip=192.168.10.14
-k8s-node3 ansible_host=192.168.10.13 ip=192.168.10.13
-EOF
-```
-
-- 변경전 etcd 확인
-
-```
-ssh k8s-node1 etcdctl.sh member list -w table
-ssh k8s-node1 etcdctl.sh endpoint status -w table
-```
-
-
-```bash
-ansible-playbook -i inventory/mycluster/inventory.ini -v cluster.yml --tags "control-plane" --limit kube_control_plane -e kube_version="1.32.9"
-```
-
-- 변경후 etcd 확인
-
-
-- k8s-node1 제거
-
-```
-ansible-playbook -i inventory/mycluster/inventory.ini -v remove-node.yml -e node=k8s-node1 -e skip_confirmation=true
-```
