@@ -1,3 +1,13 @@
+---
+layout: post
+title: "[K8S Deploy Study by Gasida] -  Kubespary HA & Upgrade - 4 ETCD 노드 추가  및 제거 해보기"
+tags:
+  - ETCD
+  - kubespray
+  - kubernetes
+  - Ansible
+---
+
 
 >목표
 >ETCD 노드를 추가 및 제거 실습을 진행한다
