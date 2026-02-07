@@ -1,5 +1,5 @@
 ---
-post:
+layout: post
 tags:
   - Ansible
   - k8s
