@@ -60,7 +60,6 @@ ssh k8s-node1 cat /etc/kubernetes/manifests/kube-apiserver.yaml | grep etcd-serv
 
 ssh k8s-node2 cat /etc/kubernetes/manifests/kube-apiserver.yaml | grep etcd-servers
 
-
 ssh k8s-node3 cat /etc/kubernetes/manifests/kube-apiserver.yaml | grep etcd-servers
 ```
 
@@ -126,6 +125,24 @@ ansible-playbook -i inventory/mycluster/inventory.ini cluster.yml \
 ```
 
 
+- 컨트롤 플레인에서 etcd 주소 변경
+
+```bash
+vi /etc/kubernetes/manifests/kube-apiserver.yaml
+```
+
+
+```bash
+- --etcd-servers=https://192.168.10.11:2379,https://192.168.10.12:2379,https://192.168.10.13:2379
+```
+
+- 확인
+
+```
+for i in {1..5}; do echo ">> k8s-node$i <<"; ssh k8s-node$i etcdctl.sh endpoint status -w table; echo; done
+```
+
+![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260207T093933037Z.png)
 
 >*중요*
 인벤토리에서 먼저 삭제하면 `remove-node.yml`이 해당 노드에 접근할  수 없어 클린업이 안 된다. 반드시 제거 실행 후 인벤토리 삭제 순서를 지키자.
