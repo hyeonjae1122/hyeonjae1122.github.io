@@ -5,7 +5,7 @@ tags:
   - k8s
   - kubernetes
   - kubespray
-title: "[K8S Deploy Study by Gasida] - Kubespray offline 설치 3 k8s 설치"
+title: "[K8S Deploy Study by Gasida] - Kubespray offline 설치 - 3 k8s 설치"
 ---
 오프라인(폐쇄망) 환경에서 Kubespray를 사용해 Kubernetes 클러스터를 설치하려면, 설치에 필요한 바이너리/컨테이너 이미지/Python 패키지/RPM(deb) 패키지까지 사전에 모두 다운로드해 내부에 제공할 수 있어야 한다.
 

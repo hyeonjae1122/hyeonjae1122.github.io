@@ -5,7 +5,7 @@ tags:
   - k8s
   - kubernetes
   - kubespray
-title: "[K8S Deploy Study by Gasida] - Kubespray offline 설치 2 사전 다운로드"
+title: "[K8S Deploy Study by Gasida] - Kubespray offline 설치 - 2 사전 다운로드"
 ---
 # 리눅스 / 파이썬 패키지 및 이미지 저장소 구성
 
