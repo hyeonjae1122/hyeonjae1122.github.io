@@ -7,14 +7,15 @@ tags:
   - kubespray
 title: "[K8S Deploy Study by Gasida] - Kubespray offline 설치 3 k8s 설치"
 ---
-
-
 오프라인(폐쇄망) 환경에서 Kubespray를 사용해 Kubernetes 클러스터를 설치하려면, 설치에 필요한 바이너리/컨테이너 이미지/Python 패키지/RPM(deb) 패키지까지 사전에 모두 다운로드해 내부에 제공할 수 있어야 한다.
 
-#  준비사항
 
-## 디스크 용량 확보
+이번 단계에서는 `kubespray-offline` 오픈소스 스크립트를 활용해 이 모든 패키지를 원클릭으로 다운로드하고, 오프라인 프로비저닝에 최적화된 형태로 세팅하는 과정을 진행한다.
 
+
+# 디스크 용량 확보
+
+K8s 컴포넌트, Calico, CoreDNS, 각종 유틸리티 컨테이너 이미지의 Tarball과, OS 패키지(BaseOS, AppStream 등)의 의존성 파일을 모두 다운로드하면 `outputs/` 디렉터리에만 최소 수십 GB가 쌓이게 됩된다. 여유로운 작업과 향후 이미지 추가를 위해 `/` 파티션을 넉넉히 증설한다.
 - 기본 60G에서 120G로 증설
 
 ```bash
@@ -22,9 +23,10 @@ lsblk
 df -hT /
 ```
 
-#  repo clone & 전체 다운로드 (약 3.3GB / 17분)
+# repo clone & 전체 다운로드 (약 3.3GB / 17분)
 
 오프라인 설치에 필요한 파일/이미지/패키지/리포 구성을 전부 `outputs/` 아래로 만들어 둔다.
+- 이 작업은 반드시 인터넷 통신이 가능한 PC(혹은 DMZ 서버)에서 수행되어야 한다.
 
 ```bash
 git clone https://github.com/kubespray-offline/kubespray-offline
@@ -33,6 +35,8 @@ cd kubespray-offline
 ```
 
 - 변수 정보 확인 
+    - `config.sh`에는 다운로드할 K8s 컴포넌트들의 버전이 정의되어 있다.
+
 ```bash
 source ./config.sh
 echo -e "kubespary $KUBESPRAY_VERSION"
@@ -55,22 +59,22 @@ echo -e "cpu arch: $IMAGE_ARCH"
 
 - `download-all.sh `의 흐름 :  여러 스크립트를 순차 실행한다.
     - `config.sh` →` target-scripts/config.sh` : 버전 변수 로드
-    - `precheck.sh` : 환경점검
-    - `prepare-pkg.sh` : 의존 패키지 설치
-    - `prepare-py.sh ` : python venv + requirements 설치
-    - `get-kubespray.sh` : kubespray tarball 확보 및 패치
-    - `pypi-mirror.sh` pip 패키지 미러 생성
-    - `download-kubespray-files.sh` : kubesprary offline 목록생성 + 파일 / 이미지 다운로드    - 
-    - `download-additional-containers.sh` : 추가 이미지 다운로드 (nignx/registry등)
-    - `create-repo.sh`  : RPM 리포 생성(createrepo)  
-    - `copy-target-scripts.sh` : outputs에 설치 스크립트 복사
+    - `precheck.sh` : 환경 점검 (SELinux 및 런타임 체크)
+    - `prepare-pkg.sh` : 의존 패키지(rsync, createrepo 등) 설치
+    - `prepare-py.sh ` : Python venv 생성 및 requirements.txt 설치
+    - `get-kubespray.sh` : 지정된 버전의 Kubespray Tarball 확보 및 패치
+    - `pypi-mirror.sh` Pip 패키지 미러(PEP 503 호환 인덱스) 생성
+    - `download-kubespray-files.sh` : kubespray offline 목록(`files.list`, `images.list`) 생성 후 파일/이미지 다운로드
+    - `download-additional-containers.sh` : nginx, registry 등 오프라인 서빙에 필요한 인프라 이미지 추가 다운로드
+    - `create-repo.sh`  : RPM 다운로드 및 의존성 리포지토리 생성(`createrepo`)
+    - `copy-target-scripts.sh` : 다운로드 완료 후 `outputs/`에 설치/시작 스크립트 복사
 
-버전이 바뀌면 대부분 **이 단계에서 다운로드 대상이 달라지므로**, 버전 변수는 `target-scripts/config.sh` 에서 관리하는 게 핵심이다. 즉 버전 변경 시엔 config에서 바꾸고 다시 download-all을 해야한다. 
+버전이 바뀌면 대부분 이 단계에서 다운로드 대상이 달라지므로 버전 변수는 `target-scripts/config.sh` 에서 관리하는 게 핵심이다. 즉 버전 변경 시엔 config에서 바꾸고 다시 download-all을 해야한다. 
 
 ![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260214T081145409Z.png)
 
 
-## precheck / 패키지 / python venv
+# precheck / 패키지 / python venv
 
 ### precheck.sh
 
@@ -79,36 +83,28 @@ echo -e "cpu arch: $IMAGE_ARCH"
     
 ### prepare-pkgs.sh
 
+- 다운로드와 리포지토리 생성에 필요한 호스트 패키지(`rsync`, `gcc`, `createrepo_c` 등)를 설치
+
 ```bash
 dnf install -y rsync gcc libffi-devel createrepo git podman createrepo_c
 ```
-RHEL 계열 
-- `rsync gcc libffi-devel createrepo git podman ...`
-- RHEL 10에서 `createrepo_c` 관련 처리
     
 ### prepare-py.sh → venv.sh
+
+`~/.venv/<python버전>/` 경로에 venv를 생성하고, Kubespray 구동에 필요한 파이썬 패키지를 격리된 환경에 설치
 
 ```bash
 pip install -U pip setuptools & pip install -r requirements.txt
 ```
-
-- python venv 생성    
-- `pip install -U pip setuptools`
-- `pip install -r requirements.txt`
     
-venv 경로는 기본으로:
-- `~/.venv/<python버전>/`
 
 ## kubespray 소스 확보(get-kubespray.sh)
 
-`KUBESPRAY_VERSION`이 커밋 해시라면: git clone 후 해당 커밋 checkout한다.
-- `master` 또는 `release-...` 일 경우 : `branch clone`    
-- 일반 버전이라면: `v${KUBESPRAY_VERSION}.tar.gz` 다운로드
+`KUBESPRAY_VERSION` 변수를 기반으로 분기 처리한다.
+- 커밋 해시, `master` 또는 `release-...` 일 경우: Git Branch Clone
+-  일반 릴리즈 버전(예: v2.30.0)일 경우: GitHub에서 `.tar.gz` Tarball 다운로드
+- 다운로드 후 `outputs/files/kubespray-<ver>.tar.gz`로 저장하고, 압축을 풀어 필요한 커스텀 패치(Patch)를 적용한다.
     
-
-다운로드 후
-- `outputs/files/kubespray-<ver>.tar.gz` 로 저장
-   - `cache/kubespray-<ver>/` 로 extract 후 필요하면 patch 적용
 
 ## PyPI 미러 만들기(pypi-mirror.sh)
 
@@ -122,7 +118,7 @@ venv 경로는 기본으로:
     - `pip/setuptools/wheel` 등 추가 다운로드        
 - `pypi-mirror create` 로 HTML 인덱스 생성
 
-## kubespray offline 목록 생성 + 파일/이미지 다운로드
+# kubespray offline 목록 생성 + 파일/이미지 다운로드
 
 `download-kubespray-files.sh`는 kubespray repo 안의`contrib/offline/generate_list.sh`
 를 실행해서 `files.list`, `images.list` 를 만든다.
@@ -137,7 +133,7 @@ venv 경로는 기본으로:
 -  `download-additional-containers.sh`가 `imagelists/*.txt` 기반으로 nginx/registry 같은 추가 이미지도 다운로드
     
 
-## 로컬 repo 생성(create-repo.sh)
+# 로컬 repo 생성(create-repo.sh)
 
 RHEL일 경우 
 - `scripts/create-repo-rhel.sh` 실행
@@ -149,7 +145,7 @@ RHEL일 경우
 > 참고: `/bin/rm outputs/rpms/local/*.i686.rpm` 같은 메시지는  
 > i686 RPM이 없어서 “지울 게 없다”는 뜻이라 보통 무시해도 됨.
 
-## download-all 결과물 확인
+# download-all 결과물 확인
 
 다운로드 완료 후 `outputs/` 용량은 약 3.3GB정도이다. 
 
@@ -364,13 +360,11 @@ tree /var/lib/registry/ -L 5
 #  kubespray tarball 압축 해제
 
 ```bash
-`./extract-kubespray.sh`
+./extract-kubespray.sh
 ```
 
 - `files/kubespray-<ver>.tar.gz`를 풀어 `kubespray-<ver>/` 생성    
 - 버전별 patch 디렉터리가 있으면 적용
-
-
 - `kubespary` 저장소 압축 해제된 파일들 확인
 
 ```
