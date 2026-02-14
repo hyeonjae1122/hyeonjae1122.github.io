@@ -238,6 +238,7 @@ EOF
 
 ![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260214T090250060Z.png)
 
+![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260214T133532331Z.png)
 # 오프라인 repo / pip mirror 시스템 설정
 
 ```bash

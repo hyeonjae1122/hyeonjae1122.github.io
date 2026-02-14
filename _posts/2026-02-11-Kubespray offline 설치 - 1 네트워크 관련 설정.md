@@ -7,8 +7,27 @@ tags:
   - kubespray
 title: "[K8S Deploy Study by Gasida] - Kubespray offline 설치 - 1 네트워크 관련 설정"
 ---
+# 개요
 
-# 네트워크 게이트웨이(k8s-node의 외부 통신 끊고 내부망으로 설정)
+오프라인(폐쇄망) 환경의 쿠버네티스 클러스터를 구축하기 위해, `k8s-node`들은 외부 인터넷과 직접 통신할 수 없도록 격리해야 한다. 대신 패키지 다운로드나 외부 통신이 임시로 필요할 때, 인터넷과 연결된 `admin` 노드가 일종의 **라우터(NAT 게이트웨이)** 역할을 수행하도록 구성한다.
+
+- `net.ipv4.ip_forward = 1`
+    - 리눅스 커널이 자신의 IP가 아닌 다른 목적지로 가는 패키지를 폐기하지 않고 전달(Forwarding)하도록 허용
+- `MASQUERADE`: 내부망(`enp0s9`)에서 출발한 패킷이 외부망(`enp0s8`)으로 나갈 때, 출발지 IP를 `admin` 노드의 외부 IP로 변조하여 통신이 가능하게 해줍니다.
+
+
+# NTP 서버 동기화와 쿠버네티스 HA의 관계
+
+- **분산 시스템에서 시간 동기화(NTP)가 필수적인 이유** 
+    - 단순한 서버 시간 맞춤을 넘어, 쿠버네티스에서 시간 동기화는 클러스터의 안정성과 직결된다. 특히 쿠버네티스의 상태 데이터를 저장하는 **etcd**는 노드 간의 시간이 미세하게라도 어긋나면 리더 선출(Leader Election) 로직에 문제가 생겨 잦은 재시작이 발생하거나 고가용성(HA) 클러스터 전체에 심각한 장애를 유발할 수 있다.
+    - 또한 추후 Keycloak과 같은 인증 시스템을 클러스터에 올리고 연동할 때, 서버 간 시간이 맞지 않으면 토큰(JWT) 발행 및 만료 시간에 오차가 생겨 인증 장애로 직결됩니다. 따라서 `k8s-node`들이 `admin` 노드를 바라보도록 철저히 동기화해야 한다.
+
+# DNS 설정과 NetworkManager 제어
+
+ - NetworkManager DNS 관리를 비활성화(`dns=none`)하는 이유
+     - Rocky Linux를 비롯한 RHEL 기반 OS에서는 기본적으로 `NetworkManager`가 네트워크 인터페이스가 재시작되거나 시스템이 부팅될 때마다 `/etc/resolv.conf` 파일을 자동으로 덮어쓴다. 만약 이를 방치하면 우리가 기껏 설정해 둔 내부 DNS(`192.168.10.10`)가 초기화되어 버린다. 쿠버네티스의 내부 DNS인 **CoreDNS**는 기본적으로 호스트 노드의 `/etc/resolv.conf`를 참조하여 외부 도메인을 질의한다. 이 파일이 임의로 변경되는 것을 막는 것은 향후 발생할 수 있는 CoreDNS의 이름 해석 지연(Lag)이나 통신 실패 같은 장애를 예방하는 핵심 사전 작업이다.
+
+# (실습) 네트워크 게이트웨이(k8s-node의 외부 통신 끊고 내부망으로 설정)
 
 ## admin
 
@@ -91,7 +110,7 @@ ip route
 ```
 
 
-# NTP 서버  (admin은 한국 공용 NPT서버로, k8s-node는 admin을 NTP서버로 동기화)
+# (실습) NTP 서버  (admin은 한국 공용 NPT서버로, k8s-node는 admin을 NTP서버로 동기화)
 
 ## admin
 
@@ -186,7 +205,7 @@ timedatectl status
 chronyc sources -v
 ```
 
-# DNS 서버 (NetworkManager에서 DNS 관리 끄기)
+#  (실습) DNS 서버 (NetworkManager에서 DNS 관리 끄기)
 
 ## admin 
 
@@ -310,3 +329,11 @@ EOF
 ```bash
 systemctl restart NetworkManager
 ```
+
+
+# 네트워크 설정 최종 점검 체크리스트
+
+  다음 단계인 K8s 설치로 넘어가기 전, 아래 항목들이 정상적으로 동작하는지 확인한다.
+-  `k8s-node`에서 `ping 8.8.8.8` (IP 통신)은 정상 작동하는가?
+-   `k8s-node`에서 `curl google.com` 시, `admin`에 구축한 Bind DNS를 통해 IP를 정상적으로 받아오는가?
+- `k8s-node`에서 `chronyc sources -v` 명령어 입력 시, `admin` 노드의 IP(`192.168.10.10`) 앞에 `^*` 기호(정상 동기화 중임을 의미)가 표시되는가?
