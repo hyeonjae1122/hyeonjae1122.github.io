@@ -282,3 +282,111 @@ podman images
 ```bash
 mv /etc/containers/registries.bak /etc/containers/registries.conf
 ```
+
+
+## 프라이빗 PyPI(Python Package Index) 미러 저장소 구축
+
+### admin
+
+```bash
+pip install devpi-server devpi-client devpi-web
+pip list | grep devpi
+```
+
+
+```
+devpi-init --serverdir /data/devpi_data
+ls -al /data/devpi_data/
+```
+
+
+```
+nohup devpi-server --serverdir /data/devpi_data --host 0.0.0.0 --port 3141 > /var/log/devpi.log 2>&1 &
+```
+
+
+```
+ss -tnlp | grep devpi-server
+tail -f /var/log/devpi.log
+
+open http://192.168.10.10:3141
+```
+
+
+- 서버 연결
+
+```bash
+devpi use http://192.168.10.10:3141
+devpi login root --password ""
+pip download jmespath netaddr -d /tmp/pypi-packages
+```
+
+
+```bash
+devpi index -c prod bases=root/pypi
+devpi index -l
+
+devpi use root/pypi 
+devpi use root/prod
+
+devpi upload /tmp/pypi-packages/*
+
+devpi list
+```
+
+
+(자원 정리)
+
+```bash
+pkill -f "devpi-server --serverdir /data/devpi_data”
+```
+
+### k8s-node
+
+
+#### 방안1 일회성 사용
+
+```bash
+pip list | grep -i jmespath
+pip install jmespath --index-url http://192.168.10.10:3141/root/prod/+simple --trusted-host 192.168.10.10
+pip list | grep -i jmespath
+```
+
+
+#### (방안2) 전역 설정 
+-  /root/prod (사람용 웹 UI)
+-  /root/prod/+simple (pip 전용 API 엔드포인트)
+
+
+ pip 설정에서 반드시 +simple 붙인 URL을 써야 정상 동작한다 <- pip 표준 인덱스 엔드포인트
+ pip는 패키지 저장소를 PEP 503 “Simple API” 형식으로 접근함.
+ +simple 의미 : pip 전용 인덱스 엔드포인트, 패키지 목록을 pip가 파싱할 수 있는 HTML 포맷으로 제공
+
+```bash
+cat <<EOF > /etc/pip.conf
+[global]
+index-url = http://192.168.10.10:3141/root/prod/+simple
+trusted-host = 192.168.10.10
+timeout = 60
+EOF
+```
+
+
+```bash
+pip list | grep -i netaddr
+pip install netaddr
+```
+
+
+```bash
+pip install cryptography
+```
+
+
+![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260214T080235311Z.png)
+
+(자원 정리)
+
+```bash
+rm -rf /etc/pip.conf
+```
