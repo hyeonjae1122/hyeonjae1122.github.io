@@ -51,36 +51,5 @@ graph LR
 - VirtualBox + Vagrant 기반
 
 
-네트워크는 두 개의 NIC로 구성
 
-- `enp0s8` : 외부망  (DHCP)
-- `enp0s9` : 내부망 (Static)
-
-# 4. Network Gateway 구현
-
-## 4.1 Iptables NAT 설정
-
-```
-iptables -t nat -A POSTROUTING -o enp0s8 -j MASQUERADE
-```
-
-
-
-nftables는 systemd 기반으로 영구 저장 가능:
-
-```bash
-nft list ruleset > /etc/sysconfig/nftables.conf
-systemctl enable --now nftables
-```
-
-
-
-
-
-# kubespray offline 설치
-
-## kubespray offline소개
-#### kubespray-offline support scripts
-- 오프라인(폐쇄망) 환경을 지원하기 위한 스크립트
-- https://github.com/kubespray-offline/kubespray-offline
 
