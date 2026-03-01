@@ -36,6 +36,8 @@ sequenceDiagram
     
 ```
 
+
+![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260301T135143779Z.png)
 ## 무엇이 문제였나?
 
 얼핏 보면 문제없어 보이지만, 실제로는 아래와 같이 각각의 Service가 서로 다른 네임스페이스에 있음에도 불구하고 동일한 Client ID / Secret을 공유하고 있었습니다. (물론 Client를 어떻게 정의하냐에 따라 다르겠지만 엄연히 서비스 역할이 전혀 다른만큼 네임스페이스를 보지않더라도 별도의 클라이언트로 보는 것이 바람직합니다. )
@@ -52,7 +54,7 @@ graph LR
 ```
 
 
-
+![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260301T135155919Z.png)
 # Workload Identity 개념의 부상
 
  결국 해결해야 할 근본 문제는 클라이언트별 인증을 수행할 시크릿이 탈취되었을 때 피해 범위를 최소화하는 것입니다.  하지만 파드 스스로를 플랫폼 레벨에서 증명할 수 있다면? 그렇다면 우리는 별도의 시크릿이 필요없어집니다. 서비스가 증가함에따라 Keycloak에 접근하는 Client들이 늘어나더라도 애초에 취급하는 시크릿이 존재하지 않기 때문에 관리 비용은 크게 증가하지 않습니다. 
@@ -200,6 +202,7 @@ sequenceDiagram
 
 ```
 
+![](https://raw.githubusercontent.com/hyeonjae1122/hyeonjae1122.github.io/main/assets/20260301T135218567Z.png)
 ### Keycloak의 SA 토큰 검증 과정
 
 Keycloak이 SA JWT를 검증하는 순서는 아래와 같습니다.
