@@ -4,7 +4,7 @@ tags:
   - k8s
   - kubernetes
   - keycloak
-title: "\bKeycloak 쿠버네티스 보안"
+title: Projected Service Account Token
 ---
 # 배경
 
