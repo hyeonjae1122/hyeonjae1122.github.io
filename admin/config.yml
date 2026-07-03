@@ -1,0 +1,46 @@
+backend:
+  name: github
+  repo: hyeonjae1122/hyeonjae1122.github.io
+  branch: main
+  # ↓↓↓ Cloudflare Worker(decap-proxy) 배포 후 이 URL을 채우세요 ↓↓↓
+  base_url: https://decap-proxy.luminary282.workers.dev
+  auth_endpoint: /auth
+
+# 사이트 표시용 링크 (관리자 화면 우상단 "사이트 보기" 버튼)
+site_url: https://hyeonjae1122.github.io
+display_url: https://hyeonjae1122.github.io
+
+# 이미지 저장 위치 (Obsidian이 하던 역할을 Decap이 대신함)
+media_folder: "assets"      # 레포 안 실제 저장 경로
+public_folder: "/assets"    # 마크다운에서 참조되는 경로 (예: /assets/그림.png)
+
+# 관리자 UI 언어
+locale: "ko"
+
+collections:
+  - name: "posts"
+    label: "블로그 글"
+    label_singular: "글"
+    folder: "_posts"
+    create: true
+    # 파일명: 2026-07-04-제목.md  (Jekyll/Chirpy 규칙)
+    slug: "{{year}}-{{month}}-{{day}}-{{slug}}"
+    extension: "md"
+    format: "yaml-frontmatter"
+    editor:
+      preview: true
+    fields:
+      - { label: "Layout", name: "layout", widget: "hidden", default: "post" }
+      - { label: "제목", name: "title", widget: "string" }
+      - {
+          label: "작성일",
+          name: "date",
+          widget: "datetime",
+          format: "YYYY-MM-DD HH:mm:ss ZZ",
+          date_format: "YYYY-MM-DD",
+          time_format: "HH:mm",
+          picker_utc: false,
+        }
+      - { label: "태그", name: "tags", widget: "list", required: false }
+      - { label: "카테고리", name: "categories", widget: "list", required: false }
+      - { label: "본문", name: "body", widget: "markdown" }
